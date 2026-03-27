@@ -2,9 +2,13 @@ import { getCached, setCache, CACHE_TTL } from "./cache";
 
 const GHL_BASE = "https://services.leadconnectorhq.com";
 
-// GHL v2 API is inconsistent: most endpoints use locationId (camelCase) but
-// /opportunities/search uses location_id (snake_case). We pass both to be safe.
-async function ghlFetch(endpoint: string) {
+// GHL v2 API has strict schema validation per endpoint:
+// - /opportunities/search       → location_id (snake_case only)
+// - /opportunities/pipelines    → locationId  (camelCase only)
+// - /contacts/                  → locationId  (camelCase only)
+// - /payments/transactions      → no location param (inferred from token; needs Payments scope)
+// Passing both causes 422. Use locationParam to control which is appended.
+async function ghlFetch(endpoint: string, locationParam: "camel" | "snake" | "none" = "camel") {
   const token = process.env.GHL_API_TOKEN;
   const locationId = process.env.GHL_LOCATION_ID;
   if (!token || !locationId) throw new Error("GHL credentials not configured");
@@ -35,9 +39,9 @@ export async function getOpportunities(pipelineId?: string) {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  // limit=100 ensures we get a meaningful page of results
+  // /opportunities/search requires location_id (snake_case) — rejects locationId
   const params = pipelineId ? `?pipelineId=${pipelineId}&limit=100` : "?limit=100";
-  const data = await ghlFetch(`/opportunities/search${params}`);
+  const data = await ghlFetch(`/opportunities/search${params}`, "snake");
   setCache(cacheKey, data, CACHE_TTL.GHL);
   return data;
 }
@@ -49,7 +53,7 @@ export async function getContacts(query?: string) {
   if (cached) return cached;
 
   const params = query ? `?query=${encodeURIComponent(query)}` : "";
-  const data = await ghlFetch(`/contacts/${params}`);
+  const data = await ghlFetch(`/contacts/${params}`, "camel");
   setCache(cacheKey, data, CACHE_TTL.GHL);
   return data;
 }
@@ -67,7 +71,8 @@ export async function getPayments(startDate?: string, endDate?: string) {
   if (startDate && endDate) {
     params = `?startAt=${startDate}&endAt=${endDate}`;
   }
-  const data = await ghlFetch(`/payments/transactions${params}`);
+  // /payments/transactions: location inferred from token. Needs "Payments" scope on PIT.
+  const data = await ghlFetch(`/payments/transactions${params}`, "none");
   setCache(cacheKey, data, CACHE_TTL.GHL);
   return data;
 }
@@ -78,7 +83,8 @@ export async function getPipelines() {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  const data = await ghlFetch("/opportunities/pipelines");
+  // /opportunities/pipelines requires locationId (camelCase) — rejects location_id
+  const data = await ghlFetch("/opportunities/pipelines", "camel");
   setCache(cacheKey, data, CACHE_TTL.GHL);
   return data;
 }
