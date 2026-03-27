@@ -15,8 +15,11 @@ async function ghlFetch(endpoint: string, locationParam: "camel" | "snake" | "no
 
   const url = `${GHL_BASE}${endpoint}`;
   const sep = url.includes("?") ? "&" : "?";
-  // Pass both camelCase and snake_case â GHL silently ignores unknown params
-  const fullUrl = `${url}${sep}locationId=${locationId}&location_id=${locationId}`;
+  const locSuffix =
+    locationParam === "camel" ? `${sep}locationId=${locationId}` :
+    locationParam === "snake" ? `${sep}location_id=${locationId}` :
+    "";
+  const fullUrl = `${url}${locSuffix}`;
 
   const res = await fetch(fullUrl, {
     headers: {
