@@ -13,7 +13,7 @@ import type {
   MonthlyChurn,
 } from "@/lib/types";
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Design Tokens Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Design Tokens ──────────────────────────────────────────────────────────
 const T = {
   bg: "#0f1117",
   card: "#181b23",
@@ -28,128 +28,9 @@ const T = {
   cardPad: 20,
 };
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Demo Data Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
-const DEMO_DATA: DashboardData = {
-  lastUpdated: new Date().toISOString(),
-  period: "Mar 2026",
-  sales: {
-    totalCalls: 187,
-    setsBooked: 112,
-    showRate: 0.72,
-    closedDeals: 34,
-    closeRate: 0.182,
-    cashCollected: 289_400,
-    avgDealSize: 8_512,
-    pipelineValue: 478_200,
-    setterToCloseConversion: 0.304,
-    closers: [
-      { name: "Drew", calls: 42, closes: 9, revenue: 76_500, rate: 0.214 },
-      { name: "Marcus", calls: 38, closes: 7, revenue: 59_500, rate: 0.184 },
-      { name: "Trey", calls: 31, closes: 6, revenue: 51_000, rate: 0.194 },
-      { name: "Jordan", calls: 28, closes: 5, revenue: 42_500, rate: 0.179 },
-      { name: "Chris", calls: 24, closes: 4, revenue: 34_000, rate: 0.167 },
-      { name: "Brandon", calls: 24, closes: 3, revenue: 25_900, rate: 0.125 },
-    ],
-    setters: [
-      { name: "Kia", setsBooked: 18, showed: 14, convRate: 0.778 },
-      { name: "Deja", setsBooked: 16, showed: 12, convRate: 0.75 },
-      { name: "Malik", setsBooked: 15, showed: 10, convRate: 0.667 },
-      { name: "Tasha", setsBooked: 14, showed: 11, convRate: 0.786 },
-      { name: "Rico", setsBooked: 13, showed: 9, convRate: 0.692 },
-      { name: "Nia", setsBooked: 12, showed: 8, convRate: 0.667 },
-      { name: "Jamal", setsBooked: 12, showed: 9, convRate: 0.75 },
-      { name: "Keisha", setsBooked: 12, showed: 8, convRate: 0.667 },
-    ],
-    weeklyTrend: [
-      { week: "W1", revenue: 62_300, deals: 8 },
-      { week: "W2", revenue: 78_100, deals: 10 },
-      { week: "W3", revenue: 84_500, deals: 9 },
-      { week: "W4", revenue: 64_500, deals: 7 },
-    ],
-  },
-  fulfillment: {
-    activeClients: 142,
-    newOnboardings: 34,
-    avgOnboardingDays: 3.2,
-    clientSatisfaction: 8.7,
-    churnRate: 0.052,
-    churnedThisMonth: 7,
-    retentionRate: 0.948,
-    csms: [
-      { name: "Philip Blake", activeClients: 74, onboarded: 18, avgDays: 2.9, satisfaction: 8.9 },
-      { name: "Juanyetta Beasley", activeClients: 68, onboarded: 16, avgDays: 3.5, satisfaction: 8.5 },
-    ],
-    monthlyChurn: [
-      { month: "Oct", rate: 0.068 },
-      { month: "Nov", rate: 0.061 },
-      { month: "Dec", rate: 0.057 },
-      { month: "Jan", rate: 0.054 },
-      { month: "Feb", rate: 0.049 },
-      { month: "Mar", rate: 0.052 },
-    ],
-  },
-  financial: {
-    mrr: 289_400,
-    mrrGrowth: 0.12,
-    totalRevenueMTD: 289_400,
-    projectedMonthly: 342_000,
-    refunds: 8_500,
-    refundRate: 0.029,
-    ltv: 24_800,
-    cac: 3_200,
-    ltvCacRatio: 7.75,
-    monthlyRevenue: [
-      { month: "Oct", revenue: 218_000 },
-      { month: "Nov", revenue: 234_000 },
-      { month: "Dec", revenue: 245_000 },
-      { month: "Jan", revenue: 261_000 },
-      { month: "Feb", revenue: 278_000 },
-      { month: "Mar", revenue: 289_400 },
-    ],
-  },
-  ar: {
-    totalOutstanding: 67_400,
-    current: 28_200,
-    days30: 18_600,
-    days60: 12_400,
-    days90plus: 8_200,
-    collectionRate: 0.92,
-    avgDaysToCollect: 22,
-    failedPayments: 14,
-    failedPaymentAmount: 11_800,
-    paymentPlanActive: 23,
-    paymentPlanValue: 41_200,
-  },
-  marketing: {
-    totalLeads: 312,
-    adLeads: 198,
-    organicLeads: 114,
-    adSpend: 24_800,
-    costPerLead: 125.25,
-    costPerAcquisition: 729.41,
-    roas: 11.67,
-    adCallsBooked: 84,
-    organicCallsBooked: 28,
-    adShowRate: 0.68,
-    organicShowRate: 0.75,
-    channels: [
-      { name: "Facebook Ads", leads: 142, spend: 18_200, cpl: 128.17, booked: 58, closed: 18 },
-      { name: "Instagram Ads", leads: 56, spend: 6_600, cpl: 117.86, booked: 26, closed: 8 },
-      { name: "YouTube (Organic)", leads: 48, spend: 0, cpl: 0, booked: 12, closed: 4 },
-      { name: "TikTok (Organic)", leads: 34, spend: 0, cpl: 0, booked: 8, closed: 2 },
-      { name: "Referrals", leads: 32, spend: 0, cpl: 0, booked: 8, closed: 2 },
-    ],
-    weeklyAdPerformance: [
-      { week: "W1", spend: 5_800, leads: 44, cpl: 131.82 },
-      { week: "W2", spend: 6_200, leads: 52, cpl: 119.23 },
-      { week: "W3", spend: 6_900, leads: 58, cpl: 118.97 },
-      { week: "W4", spend: 5_900, leads: 44, cpl: 134.09 },
-    ],
-  },
-  errors: [],
-};
+// No demo data — dashboard always shows real API data or clear error states
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Helpers Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Helpers ────────────────────────────────────────────────────────────────
 const fmt = {
   usd: (n: number) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 }),
   pct: (n: number) => (n * 100).toFixed(1) + "%",
@@ -167,7 +48,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "ar", label: "AR" },
 ];
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Reusable Components Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Reusable Components ────────────────────────────────────────────────────
 
 function MetricCard({
   label,
@@ -339,7 +220,7 @@ function DataTable({
             <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)" }}>
               {columns.map((col) => {
                 const val = row[col.key];
-                const display = col.format ? col.format(val) : String(val ?? "Ã¢ÂÂ");
+                const display = col.format ? col.format(val) : String(val ?? "—");
                 const clr = col.colorFn ? col.colorFn(val) : undefined;
                 return (
                   <td key={col.key} style={{ ...cellStyle(col.align), color: clr || T.text }}>
@@ -374,7 +255,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Tab Content Components Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Tab Content Components ────────────────────────────────────────────────
 
 function OverviewTab({ d }: { d: DashboardData }) {
   const adPct = d.marketing.totalLeads > 0 ? d.marketing.adLeads / d.marketing.totalLeads : 0;
@@ -440,7 +321,7 @@ function SalesTab({ d }: { d: DashboardData }) {
         <MetricCard label="Close Rate" value={fmt.pct(s.closeRate)} color={s.closeRate >= 0.15 ? T.green : T.red} />
         <MetricCard label="Avg Deal Size" value={fmt.usd(s.avgDealSize)} />
         <MetricCard label="Pipeline Value" value={fmt.usd(s.pipelineValue)} />
-        <MetricCard label="SetterÃ¢ÂÂClose" value={fmt.pct(s.setterToCloseConversion)} />
+        <MetricCard label="Setter→Close" value={fmt.pct(s.setterToCloseConversion)} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
@@ -557,7 +438,7 @@ function MarketingTab({ d }: { d: DashboardData }) {
             { key: "name", label: "Channel" },
             { key: "leads", label: "Leads", align: "right", format: (v: number) => fmt.num(v) },
             { key: "spend", label: "Spend", align: "right", format: (v: number) => fmt.usd(v) },
-            { key: "cpl", label: "CPL", align: "right", format: (v: number) => (v > 0 ? fmt.usd(v) : "Ã¢ÂÂ") },
+            { key: "cpl", label: "CPL", align: "right", format: (v: number) => (v > 0 ? fmt.usd(v) : "—") },
             { key: "booked", label: "Calls Booked", align: "right", format: (v: number) => fmt.num(v) },
             { key: "closed", label: "Closed", align: "right", format: (v: number) => fmt.num(v) },
           ]}
@@ -620,14 +501,13 @@ function ARTab({ d }: { d: DashboardData }) {
   );
 }
 
-// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Main Dashboard Component Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
+// ─── Main Dashboard Component ───────────────────────────────────────────────
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
-  const [isDemo, setIsDemo] = useState(false);
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
   const [authError, setAuthError] = useState(false);
@@ -650,27 +530,11 @@ export default function Dashboard() {
         if (!res.ok) throw new Error(`API returned ${res.status}`);
 
         const json: DashboardData = await res.json();
-
-        // Check if data is essentially empty (all zeros) Ã¢ÂÂ use demo
-        const isEmpty =
-          json.sales.totalCalls === 0 &&
-          json.sales.cashCollected === 0 &&
-          json.marketing.totalLeads === 0 &&
-          json.financial.mrr === 0;
-
-        if (isEmpty) {
-          setData(DEMO_DATA);
-          setIsDemo(true);
-        } else {
-          setData(json);
-          setIsDemo(false);
-        }
+        setData(json);
         setAuthed(true);
         setAuthError(false);
       } catch (err: any) {
         console.error("Fetch error:", err);
-        setData(DEMO_DATA);
-        setIsDemo(true);
         setError(err.message);
         setAuthed(true);
       } finally {
@@ -699,7 +563,7 @@ export default function Dashboard() {
     fetchData(password);
   };
 
-  // Ã¢ÂÂÃ¢ÂÂ Login Screen Ã¢ÂÂÃ¢ÂÂ
+  // ── Login Screen ──
   if (!authed && authError) {
     return (
       <div
@@ -767,7 +631,7 @@ export default function Dashboard() {
     );
   }
 
-  // Ã¢ÂÂÃ¢ÂÂ Loading Screen Ã¢ÂÂÃ¢ÂÂ
+  // ── Loading Screen ──
   if (loading && !data) {
     return (
       <div
@@ -798,9 +662,50 @@ export default function Dashboard() {
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: T.bg,
+          color: T.text,
+        }}
+      >
+        <div style={{ textAlign: "center", maxWidth: 480, padding: 24 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Unable to Load Dashboard</div>
+          {error && (
+            <div style={{ fontSize: 14, color: T.red, marginBottom: 16, lineHeight: 1.5 }}>
+              {error}
+            </div>
+          )}
+          <div style={{ fontSize: 13, color: T.muted, marginBottom: 20, lineHeight: 1.6 }}>
+            Check that API credentials are correctly set in Vercel environment variables:
+            GHL_API_TOKEN, GHL_LOCATION_ID, HYROS_API_KEY
+          </div>
+          <button
+            onClick={() => fetchData(password)}
+            style={{
+              backgroundColor: T.accent,
+              color: "#fff",
+              border: "none",
+              padding: "10px 24px",
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  // Ã¢ÂÂÃ¢ÂÂ Dashboard Ã¢ÂÂÃ¢ÂÂ
+  // ── Dashboard ──
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 24px 60px" }}>
       {/* Header */}
@@ -813,18 +718,31 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {isDemo && (
+          {data.errors.length > 0 ? (
             <div
               style={{
-                backgroundColor: "rgba(245, 158, 11, 0.15)",
-                color: T.amber,
+                backgroundColor: "rgba(239, 68, 68, 0.15)",
+                color: T.red,
                 padding: "6px 14px",
                 borderRadius: 6,
                 fontSize: 12,
                 fontWeight: 600,
               }}
             >
-              DEMO DATA
+              API ERRORS ({data.errors.length})
+            </div>
+          ) : (
+            <div
+              style={{
+                backgroundColor: "rgba(34, 197, 94, 0.15)",
+                color: T.green,
+                padding: "6px 14px",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              LIVE
             </div>
           )}
         </div>
