@@ -62,17 +62,11 @@ function transformData(
   const organicLeads = hyrosLeads.length - adLeads;
 
   // ââ Ad spend: Meta campaigns as primary source, Hyros attribution as fallback ââ
-  const metaCampaigns = meta?.campaigns?.data || [];
-  const metaAdSpend = metaCampaigns.reduce(
-    (sum: number, c: any) => sum + parseFloat(c.spend || "0"),
-    0
-  );
   const hyrosAdSpend = hyrosAttribution.reduce(
     (sum: number, attr: any) => sum + (attr.cost || 0),
     0
   );
-  // Use Meta if it returned data, otherwise fall back to Hyros attribution
-  const totalAdSpend = metaAdSpend > 0 ? metaAdSpend : hyrosAdSpend;
+  const totalAdSpend = hyrosAdSpend;
 
   // Build channel breakdown from Hyros attribution
   const channelMap = new Map<string, { leads: number; spend: number; booked: number; closed: number }>();
