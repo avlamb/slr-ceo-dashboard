@@ -239,8 +239,6 @@ export async function GET(request: Request) {
     }
   }
 
-  }
-
   const dashboard = transformData(ghl, hyros, errors);
 
   // Only cache if no errors
