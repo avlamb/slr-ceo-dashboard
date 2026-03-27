@@ -20,7 +20,8 @@ async function ghlFetch(endpoint: string) {
   });
 
   if (!res.ok) {
-    throw new Error(`GHL API error: ${res.status} ${res.statusText}`);
+    const body = await res.text().catch(() => "");
+    throw new Error(`GHL API error: ${res.status} ${res.statusText} â ${body.slice(0, 200)}`);
   }
   return res.json();
 }
@@ -31,15 +32,10 @@ export async function getOpportunities(pipelineId?: string) {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  try {
-    const params = pipelineId ? `?pipelineId=${pipelineId}` : "";
-    const data = await ghlFetch(`/opportunities/search${params}`);
-    setCache(cacheKey, data, CACHE_TTL.GHL);
-    return data;
-  } catch (err) {
-    console.error("GHL opportunities fetch error:", err);
-    return { opportunities: [] };
-  }
+  const params = pipelineId ? `?pipelineId=${pipelineId}` : "";
+  const data = await ghlFetch(`/opportunities/search${params}`);
+  setCache(cacheKey, data, CACHE_TTL.GHL);
+  return data;
 }
 
 // âââ Fetch contacts with tags ââââââââââââââââââââââââââââââââââââââââââ
@@ -48,15 +44,10 @@ export async function getContacts(query?: string) {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  try {
-    const params = query ? `?query=${encodeURIComponent(query)}` : "";
-    const data = await ghlFetch(`/contacts/${params}`);
-    setCache(cacheKey, data, CACHE_TTL.GHL);
-    return data;
-  } catch (err) {
-    console.error("GHL contacts fetch error:", err);
-    return { contacts: [] };
-  }
+  const params = query ? `?query=${encodeURIComponent(query)}` : "";
+  const data = await ghlFetch(`/contacts/${params}`);
+  setCache(cacheKey, data, CACHE_TTL.GHL);
+  return data;
 }
 
 // âââ Fetch payments/transactions âââââââââââââââââââââââââââââââââââââââ
@@ -65,18 +56,13 @@ export async function getPayments(startDate?: string, endDate?: string) {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  try {
-    let params = "";
-    if (startDate && endDate) {
-      params = `?startAt=${startDate}&endAt=${endDate}`;
-    }
-    const data = await ghlFetch(`/payments/transactions${params}`);
-    setCache(cacheKey, data, CACHE_TTL.GHL);
-    return data;
-  } catch (err) {
-    console.error("GHL payments fetch error:", err);
-    return { data: [] };
+  let params = "";
+  if (startDate && endDate) {
+    params = `?startAt=${startDate}&endAt=${endDate}`;
   }
+  const data = await ghlFetch(`/payments/transactions${params}`);
+  setCache(cacheKey, data, CACHE_TTL.GHL);
+  return data;
 }
 
 // âââ Fetch pipelines ââââââââââââââââââââââââââââââââââââââââââââââââââ
@@ -85,14 +71,9 @@ export async function getPipelines() {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  try {
-    const data = await ghlFetch("/opportunities/pipelines");
-    setCache(cacheKey, data, CACHE_TTL.GHL);
-    return data;
-  } catch (err) {
-    console.error("GHL pipelines fetch error:", err);
-    return { pipelines: [] };
-  }
+  const data = await ghlFetch("/opportunities/pipelines");
+  setCache(cacheKey, data, CACHE_TTL.GHL);
+  return data;
 }
 
 // âââ Aggregate GHL data for dashboard ââââââââââââââââââââââââââââââââââ
@@ -101,23 +82,41 @@ export async function getGHLDashboardData() {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
+  // Fail fast if credentials are missing
+  const token = process.env.GHL_API_TOKEN;
+  const locationId = process.env.GHL_LOCATION_ID;
+  if (!token || !locationId) {
+    throw new Error(
+      `GHL credentials missing: ${!token ? "GHL_API_TOKEN" : ""}${!token && !locationId ? ", " : ""}${!locationId ? "GHL_LOCATION_ID" : ""}`
+    );
+  }
+
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const endOfMonth = now.toISOString();
 
+  const errors: string[] = [];
   const [opportunities, payments, pipelines] = await Promise.allSettled([
     getOpportunities(),
     getPayments(startOfMonth, endOfMonth),
     getPipelines(),
   ]);
 
+  if (opportunities.status === "rejected") errors.push(`Opportunities: ${opportunities.reason?.message}`);
+  if (payments.status === "rejected") errors.push(`Payments: ${payments.reason?.message}`);
+  if (pipelines.status === "rejected") errors.push(`Pipelines: ${pipelines.reason?.message}`);
+
   const result = {
     opportunities: opportunities.status === "fulfilled" ? opportunities.value : { opportunities: [] },
     payments: payments.status === "fulfilled" ? payments.value : { data: [] },
     pipelines: pipelines.status === "fulfilled" ? pipelines.value : { pipelines: [] },
+    errors,
     fetchedAt: new Date().toISOString(),
   };
 
-  setCache(cacheKey, result, CACHE_TTL.GHL);
+  // Only cache if no errors
+  if (errors.length === 0) {
+    setCache(cacheKey, result, CACHE_TTL.GHL);
+  }
   return result;
 }
