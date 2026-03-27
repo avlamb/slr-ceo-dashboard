@@ -12,6 +12,7 @@ import type {
   MonthlyRevenuePoint,
   MonthlyChurn,
 } from "@/lib/types";
+import { DEMO_DATA } from "@/lib/demo-data";
 
 // ─── Design Tokens ──────────────────────────────────────────────────────────
 const T = {
@@ -27,8 +28,6 @@ const T = {
   cardRadius: 12,
   cardPad: 20,
 };
-
-// No demo data — dashboard always shows real API data or clear error states
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 const fmt = {
@@ -507,6 +506,7 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const [tab, setTab] = useState<Tab>("overview");
   const [password, setPassword] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -531,11 +531,15 @@ export default function Dashboard() {
 
         const json: DashboardData = await res.json();
         setData(json);
+        setIsDemoMode(false);
         setAuthed(true);
         setAuthError(false);
       } catch (err: any) {
         console.error("Fetch error:", err);
         setError(err.message);
+        // Fall back to demo data so dashboard is never blank
+        setData(DEMO_DATA);
+        setIsDemoMode(true);
         setAuthed(true);
       } finally {
         setLoading(false);
@@ -546,7 +550,7 @@ export default function Dashboard() {
 
   // Initial fetch
   useEffect(() => {
-    // Try without password first
+    //Try without password first
     fetchData("");
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -662,6 +666,7 @@ export default function Dashboard() {
     );
   }
 
+  // If data is still null after loading (shouldn't happen with demo fallback, but guard it)
   if (!data) {
     return (
       <div
@@ -674,32 +679,8 @@ export default function Dashboard() {
           color: T.text,
         }}
       >
-        <div style={{ textAlign: "center", maxWidth: 480, padding: 24 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Unable to Load Dashboard</div>
-          {error && (
-            <div style={{ fontSize: 14, color: T.red, marginBottom: 16, lineHeight: 1.5 }}>
-              {error}
-            </div>
-          )}
-          <div style={{ fontSize: 13, color: T.muted, marginBottom: 20, lineHeight: 1.6 }}>
-            Check that API credentials are correctly set in Vercel environment variables:
-            GHL_API_TOKEN, GHL_LOCATION_ID, HYROS_API_KEY
-          </div>
-          <button
-            onClick={() => fetchData(password)}
-            style={{
-              backgroundColor: T.accent,
-              color: "#fff",
-              border: "none",
-              padding: "10px 24px",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Retry
-          </button>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 15, color: T.muted }}>Loading dashboard...</div>
         </div>
       </div>
     );
@@ -718,7 +699,20 @@ export default function Dashboard() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {data.errors.length > 0 ? (
+          {isDemoMode ? (
+            <div
+              style={{
+                backgroundColor: "rgba(245, 158, 11, 0.15)",
+                color: T.amber,
+                padding: "6px 14px",
+                borderRadius: 6,
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              DEMO MODE
+            </div>
+          ) : data.errors.length > 0 ? (
             <div
               style={{
                 backgroundColor: "rgba(239, 68, 68, 0.15)",
@@ -748,8 +742,26 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Demo Mode Banner */}
+      {isDemoMode && (
+        <div
+          style={{
+            backgroundColor: "rgba(245, 158, 11, 0.1)",
+            border: `1px solid ${T.amber}`,
+            borderRadius: 8,
+            padding: "10px 16px",
+            marginBottom: 10,
+            fontSize: 13,
+            color: T.amber,
+          }}
+        >
+          <span style={{ fontWeight: 600 }}>DEMO MODE</span>
+          {" — "}API credentials not reachable. Showing sample data. Set GHL_API_TOKEN, GHL_LOCATION_ID, HYROS_API_KEY, META_ACCESS_TOKEN in Vercel environment variables.
+        </div>
+      )}
+
       {/* Error Banners */}
-      {data.errors.length > 0 &&
+      {!isDemoMode && data.errors.length > 0 &&
         data.errors.map((err, i) => (
           <div
             key={i}
