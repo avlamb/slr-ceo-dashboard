@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getGHLDashboardData } from "@/lib/ghl";
 import { getHyrosDashboardData } from "@/lib/hyros";
+import { getMetaDashboardData } from "@/lib/meta";
 import { getCached, setCache, CACHE_TTL } from "@/lib/cache";
 import type { DashboardData, DataSourceError } from "@/lib/types";
 
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 function transformData(
   ghl: any,
   hyros: any,
+  meta: any,
   errors: DataSourceError[]
 ): DashboardData {
   const now = new Date();
@@ -61,11 +63,18 @@ function transformData(
   ).length;
   const organicLeads = hyrosLeads.length - adLeads;
 
-  // ââ Calculate ad spend from Hyros attribution data ââ
-  const totalAdSpend = hyrosAttribution.reduce(
+  // ââ Ad spend: Meta campaigns as primary source, Hyros attribution as fallback ââ
+  const metaCampaigns = meta?.campaigns?.data || [];
+  const metaAdSpend = metaCampaigns.reduce(
+    (sum: number, c: any) => sum + parseFloat(c.spend || "0"),
+    0
+  );
+  const hyrosAdSpend = hyrosAttribution.reduce(
     (sum: number, attr: any) => sum + (attr.cost || 0),
     0
   );
+  // Use Meta if it returned data, otherwise fall back to Hyros attribution
+  const totalAdSpend = metaAdSpend > 0 ? metaAdSpend : hyrosAdSpend;
 
   // Build channel breakdown from Hyros attribution
   const channelMap = new Map<string, { leads: number; spend: number; booked: number; closed: number }>();
@@ -77,6 +86,15 @@ function transformData(
     existing.spend += attr.cost || 0;
     existing.closed += attr.sales || 0;
     channelMap.set(source, existing);
+  });
+
+  // Supplement channel breakdown with Meta campaign data if available
+  metaCampaigns.forEach((c: any) => {
+    const name = c.campaign_name || "Meta Campaign";
+    const existing = channelMap.get(name) || { leads: 0, spend: 0, booked: 0, closed: 0 };
+    existing.spend = Math.max(existing.spend, parseFloat(c.spend || "0"));
+    existing.leads += (c.actions || []).filter((a: any) => a.action_type === "lead").length;
+    channelMap.set(name, existing);
   });
 
   const channels = Array.from(channelMap.entries())
@@ -141,7 +159,7 @@ function transformData(
       refunds: refundAmount,
       refundRate: totalRevenue > 0 ? refundAmount / totalRevenue : 0,
       ltv: 0, // Needs historical calculation
-      cac: hyrosLeads.length > 0 ? totalAdSpend / closedOpps.length : 0,
+      cac: closedOpps.length > 0 ? totalAdSpend / closedOpps.length : 0,
       ltvCacRatio: 0,
       monthlyRevenue: [],
     },
@@ -203,14 +221,16 @@ export async function GET(request: Request) {
 
   const errors: DataSourceError[] = [];
 
-  // Fetch all sources in parallel (GHL + Hyros only â Hyros provides ad spend via attribution)
-  const [ghlResult, hyrosResult] = await Promise.allSettled([
+  // Fetch all three sources in parallel
+  const [ghlResult, hyrosResult, metaResult] = await Promise.allSettled([
     getGHLDashboardData(),
     getHyrosDashboardData(),
+    getMetaDashboardData(),
   ]);
 
   const ghl = ghlResult.status === "fulfilled" ? ghlResult.value : null;
   const hyros = hyrosResult.status === "fulfilled" ? hyrosResult.value : null;
+  const meta = metaResult.status === "fulfilled" ? metaResult.value : null;
 
   if (ghlResult.status === "rejected") {
     errors.push({
@@ -238,7 +258,20 @@ export async function GET(request: Request) {
     }
   }
 
-  const dashboard = transformData(ghl, hyros, errors);
+  if (metaResult.status === "rejected") {
+    errors.push({
+      source: "meta",
+      message: metaResult.reason?.message || "Meta fetch failed",
+      timestamp: new Date().toISOString(),
+    });
+  } else if (meta?.errors?.length) {
+    // Partial Meta errors (some endpoints failed)
+    for (const e of meta.errors) {
+      errors.push({ source: "meta", message: e, timestamp: new Date().toISOString() });
+    }
+  }
+
+  const dashboard = transformData(ghl, hyros, meta, errors);
 
   // Only cache if no errors
   if (errors.length === 0) {
