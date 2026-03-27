@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getGHLDashboardData } from "@/lib/ghl";
 import { getHyrosDashboardData } from "@/lib/hyros";
-import { getMetaDashboardData } from "@/lib/meta";
 import { getCached, setCache, CACHE_TTL } from "@/lib/cache";
 import type { DashboardData, DataSourceError } from "@/lib/types";
 
@@ -12,7 +11,6 @@ export const dynamic = "force-dynamic";
 function transformData(
   ghl: any,
   hyros: any,
-  meta: any,
   errors: DataSourceError[]
 ): DashboardData {
   const now = new Date();
@@ -86,15 +84,6 @@ function transformData(
     existing.spend += attr.cost || 0;
     existing.closed += attr.sales || 0;
     channelMap.set(source, existing);
-  });
-
-  // Supplement channel breakdown with Meta campaign data if available
-  metaCampaigns.forEach((c: any) => {
-    const name = c.campaign_name || "Meta Campaign";
-    const existing = channelMap.get(name) || { leads: 0, spend: 0, booked: 0, closed: 0 };
-    existing.spend = Math.max(existing.spend, parseFloat(c.spend || "0"));
-    existing.leads += (c.actions || []).filter((a: any) => a.action_type === "lead").length;
-    channelMap.set(name, existing);
   });
 
   const channels = Array.from(channelMap.entries())
@@ -222,15 +211,13 @@ export async function GET(request: Request) {
   const errors: DataSourceError[] = [];
 
   // Fetch all three sources in parallel
-  const [ghlResult, hyrosResult, metaResult] = await Promise.allSettled([
+  const [ghlResult, hyrosResult] = await Promise.allSettled([
     getGHLDashboardData(),
     getHyrosDashboardData(),
-    getMetaDashboardData(),
   ]);
 
   const ghl = ghlResult.status === "fulfilled" ? ghlResult.value : null;
   const hyros = hyrosResult.status === "fulfilled" ? hyrosResult.value : null;
-  const meta = metaResult.status === "fulfilled" ? metaResult.value : null;
 
   if (ghlResult.status === "rejected") {
     errors.push({
@@ -258,20 +245,9 @@ export async function GET(request: Request) {
     }
   }
 
-  if (metaResult.status === "rejected") {
-    errors.push({
-      source: "meta",
-      message: metaResult.reason?.message || "Meta fetch failed",
-      timestamp: new Date().toISOString(),
-    });
-  } else if (meta?.errors?.length) {
-    // Partial Meta errors (some endpoints failed)
-    for (const e of meta.errors) {
-      errors.push({ source: "meta", message: e, timestamp: new Date().toISOString() });
-    }
   }
 
-  const dashboard = transformData(ghl, hyros, meta, errors);
+  const dashboard = transformData(ghl, hyros, errors);
 
   // Only cache if no errors
   if (errors.length === 0) {
