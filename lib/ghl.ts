@@ -2,6 +2,8 @@ import { getCached, setCache, CACHE_TTL } from "./cache";
 
 const GHL_BASE = "https://services.leadconnectorhq.com";
 
+// GHL v2 API is inconsistent: most endpoints use locationId (camelCase) but
+// /opportunities/search uses location_id (snake_case). We pass both to be safe.
 async function ghlFetch(endpoint: string) {
   const token = process.env.GHL_API_TOKEN;
   const locationId = process.env.GHL_LOCATION_ID;
@@ -9,7 +11,8 @@ async function ghlFetch(endpoint: string) {
 
   const url = `${GHL_BASE}${endpoint}`;
   const sep = url.includes("?") ? "&" : "?";
-  const fullUrl = `${url}${sep}locationId=${locationId}`;
+  // Pass both camelCase and snake_case â GHL silently ignores unknown params
+  const fullUrl = `${url}${sep}locationId=${locationId}&location_id=${locationId}`;
 
   const res = await fetch(fullUrl, {
     headers: {
@@ -32,7 +35,8 @@ export async function getOpportunities(pipelineId?: string) {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  const params = pipelineId ? `?pipelineId=${pipelineId}` : "";
+  // limit=100 ensures we get a meaningful page of results
+  const params = pipelineId ? `?pipelineId=${pipelineId}&limit=100` : "?limit=100";
   const data = await ghlFetch(`/opportunities/search${params}`);
   setCache(cacheKey, data, CACHE_TTL.GHL);
   return data;
@@ -51,6 +55,9 @@ export async function getContacts(query?: string) {
 }
 
 // âââ Fetch payments/transactions âââââââââââââââââââââââââââââââââââââââ
+// NOTE: Requires the "Payments" scope on the GHL Private Integration Token.
+// If this returns 403, regenerate the PIT in GHL Settings > Private Integrations
+// and ensure "Payments" scope is checked.
 export async function getPayments(startDate?: string, endDate?: string) {
   const cacheKey = `ghl_payments_${startDate}_${endDate}`;
   const cached = getCached<any>(cacheKey);
