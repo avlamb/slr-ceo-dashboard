@@ -17,12 +17,12 @@ async function hyrosFetch(endpoint: string) {
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Hyros API error: ${res.status} ${res.statusText} â ${text.slice(0, 200)}`);
+    throw new Error(`Hyros API error: ${res.status} ${res.statusText} — ${text.slice(0, 200)}`);
   }
   return res.json();
 }
 
-// âââ Fetch leads (with date filter) ââââââââââââââââââââââââââââââââââââ
+// ─── Fetch leads (with date filter) ────────────────────────────────────
 export async function getLeads(startDate?: string, endDate?: string) {
   const cacheKey = `hyros_leads_${startDate}_${endDate}`;
   const cached = getCached<any>(cacheKey);
@@ -34,7 +34,7 @@ export async function getLeads(startDate?: string, endDate?: string) {
   return data;
 }
 
-// âââ Fetch sales ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Fetch sales ──────────────────────────────────────────────────────
 export async function getSales(startDate?: string, endDate?: string) {
   const cacheKey = `hyros_sales_${startDate}_${endDate}`;
   const cached = getCached<any>(cacheKey);
@@ -46,7 +46,7 @@ export async function getSales(startDate?: string, endDate?: string) {
   return data;
 }
 
-// âââ Fetch calls ââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Fetch calls ──────────────────────────────────────────────────────
 export async function getCalls(startDate?: string, endDate?: string) {
   const cacheKey = `hyros_calls_${startDate}_${endDate}`;
   const cached = getCached<any>(cacheKey);
@@ -58,19 +58,7 @@ export async function getCalls(startDate?: string, endDate?: string) {
   return data;
 }
 
-// âââ Fetch ad attribution data ââââââââââââââââââââââââââââââââââââââââ
-export async function getAdAttribution(startDate?: string, endDate?: string) {
-  const cacheKey = `hyros_attribution_${startDate}_${endDate}`;
-  const cached = getCached<any>(cacheKey);
-  if (cached) return cached;
-
-  const qs = startDate && endDate ? `?startDate=${startDate}&endDate=${endDate}` : "";
-  const data = await hyrosFetch(`/api/v1.0/attribution${qs}`);
-  setCache(cacheKey, data, CACHE_TTL.HYROS);
-  return data;
-}
-
-// âââ Fetch sources breakdown ââââââââââââââââââââââââââââââââââââââââââ
+// ─── Fetch sources breakdown ──────────────────────────────────────────
 export async function getSources(startDate?: string, endDate?: string) {
   const cacheKey = `hyros_sources_${startDate}_${endDate}`;
   const cached = getCached<any>(cacheKey);
@@ -82,7 +70,7 @@ export async function getSources(startDate?: string, endDate?: string) {
   return data;
 }
 
-// âââ Aggregate Hyros data for dashboard ââââââââââââââââââââââââââââââââ
+// ─── Aggregate Hyros data for dashboard ────────────────────────────────
 export async function getHyrosDashboardData() {
   const cacheKey = "hyros_dashboard";
   const cached = getCached<any>(cacheKey);
@@ -101,25 +89,22 @@ export async function getHyrosDashboardData() {
   const today = now.toISOString().split("T")[0];
 
   const errors: string[] = [];
-  const [leads, sales, calls, attribution, sources] = await Promise.allSettled([
+  const [leads, sales, calls, sources] = await Promise.allSettled([
     getLeads(startOfMonth, today),
     getSales(startOfMonth, today),
     getCalls(startOfMonth, today),
-    getAdAttribution(startOfMonth, today),
     getSources(startOfMonth, today),
   ]);
 
   if (leads.status === "rejected") errors.push(`Leads: ${leads.reason?.message}`);
   if (sales.status === "rejected") errors.push(`Sales: ${sales.reason?.message}`);
   if (calls.status === "rejected") errors.push(`Calls: ${calls.reason?.message}`);
-  if (attribution.status === "rejected") errors.push(`Attribution: ${attribution.reason?.message}`);
   if (sources.status === "rejected") errors.push(`Sources: ${sources.reason?.message}`);
 
   const result = {
     leads: leads.status === "fulfilled" ? leads.value : { data: [] },
     sales: sales.status === "fulfilled" ? sales.value : { data: [] },
     calls: calls.status === "fulfilled" ? calls.value : { data: [] },
-    attribution: attribution.status === "fulfilled" ? attribution.value : { data: [] },
     sources: sources.status === "fulfilled" ? sources.value : { data: [] },
     errors,
     fetchedAt: new Date().toISOString(),
