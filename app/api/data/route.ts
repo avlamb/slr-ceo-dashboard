@@ -218,17 +218,32 @@ export async function GET(request: Request) {
       message: ghlResult.reason?.message || "GHL fetch failed",
       timestamp: new Date().toISOString(),
     });
+  } else if (ghl?.errors?.length) {
+    // Partial GHL errors (some endpoints failed)
+    for (const e of ghl.errors) {
+      errors.push({ source: "ghl", message: e, timestamp: new Date().toISOString() });
+    }
   }
+
   if (hyrosResult.status === "rejected") {
     errors.push({
       source: "hyros",
       message: hyrosResult.reason?.message || "Hyros fetch failed",
       timestamp: new Date().toISOString(),
     });
+  } else if (hyros?.errors?.length) {
+    // Partial Hyros errors (some endpoints failed)
+    for (const e of hyros.errors) {
+      errors.push({ source: "hyros", message: e, timestamp: new Date().toISOString() });
+    }
   }
 
   const dashboard = transformData(ghl, hyros, errors);
-  setCache("dashboard_aggregated", dashboard, CACHE_TTL.AGGREGATED);
+
+  // Only cache if no errors
+  if (errors.length === 0) {
+    setCache("dashboard_aggregated", dashboard, CACHE_TTL.AGGREGATED);
+  }
 
   return NextResponse.json(dashboard);
 }
