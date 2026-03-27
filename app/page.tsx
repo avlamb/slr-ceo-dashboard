@@ -13,7 +13,7 @@ import type {
   MonthlyChurn,
 } from "@/lib/types";
 
-// âââ Design Tokens ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Design Tokens Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 const T = {
   bg: "#0f1117",
   card: "#181b23",
@@ -28,7 +28,7 @@ const T = {
   cardPad: 20,
 };
 
-// âââ Demo Data ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Demo Data Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 const DEMO_DATA: DashboardData = {
   lastUpdated: new Date().toISOString(),
   period: "Mar 2026",
@@ -149,7 +149,7 @@ const DEMO_DATA: DashboardData = {
   errors: [],
 };
 
-// âââ Helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Helpers Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 const fmt = {
   usd: (n: number) => "$" + n.toLocaleString("en-US", { maximumFractionDigits: 0 }),
   pct: (n: number) => (n * 100).toFixed(1) + "%",
@@ -167,7 +167,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "ar", label: "AR" },
 ];
 
-// âââ Reusable Components ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Reusable Components Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 function MetricCard({
   label,
@@ -203,12 +203,6 @@ function MetricCard({
       >
         {value}
       </div>
-      {sub && (
-        <div style={{ fontSize: 11, color: T.muted, marginTop: 4 }}>{sub}</div>
-      )}
-    </div>
-  );
-}</div>
       {sub && (
         <div style={{ fontSize: 11, color: T.muted, marginTop: 4 }}>{sub}</div>
       )}
@@ -345,7 +339,7 @@ function DataTable({
             <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)" }}>
               {columns.map((col) => {
                 const val = row[col.key];
-                const display = col.format ? col.format(val) : String(val ?? "â");
+                const display = col.format ? col.format(val) : String(val ?? "Ã¢ÂÂ");
                 const clr = col.colorFn ? col.colorFn(val) : undefined;
                 return (
                   <td key={col.key} style={{ ...cellStyle(col.align), color: clr || T.text }}>
@@ -380,7 +374,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
-// âââ Tab Content Components ââââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Tab Content Components Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 function OverviewTab({ d }: { d: DashboardData }) {
   const adPct = d.marketing.totalLeads > 0 ? d.marketing.adLeads / d.marketing.totalLeads : 0;
@@ -446,7 +440,7 @@ function SalesTab({ d }: { d: DashboardData }) {
         <MetricCard label="Close Rate" value={fmt.pct(s.closeRate)} color={s.closeRate >= 0.15 ? T.green : T.red} />
         <MetricCard label="Avg Deal Size" value={fmt.usd(s.avgDealSize)} />
         <MetricCard label="Pipeline Value" value={fmt.usd(s.pipelineValue)} />
-        <MetricCard label="SetterâClose" value={fmt.pct(s.setterToCloseConversion)} />
+        <MetricCard label="SetterÃ¢ÂÂClose" value={fmt.pct(s.setterToCloseConversion)} />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
@@ -563,7 +557,7 @@ function MarketingTab({ d }: { d: DashboardData }) {
             { key: "name", label: "Channel" },
             { key: "leads", label: "Leads", align: "right", format: (v: number) => fmt.num(v) },
             { key: "spend", label: "Spend", align: "right", format: (v: number) => fmt.usd(v) },
-            { key: "cpl", label: "CPL", align: "right", format: (v: number) => (v > 0 ? fmt.usd(v) : "â") },
+            { key: "cpl", label: "CPL", align: "right", format: (v: number) => (v > 0 ? fmt.usd(v) : "Ã¢ÂÂ") },
             { key: "booked", label: "Calls Booked", align: "right", format: (v: number) => fmt.num(v) },
             { key: "closed", label: "Closed", align: "right", format: (v: number) => fmt.num(v) },
           ]}
@@ -626,7 +620,7 @@ function ARTab({ d }: { d: DashboardData }) {
   );
 }
 
-// âââ Main Dashboard Component âââââââââââââââââââââââââââââââââââââââââââââââ
+// Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂ Main Dashboard Component Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -657,7 +651,7 @@ export default function Dashboard() {
 
         const json: DashboardData = await res.json();
 
-        // Check if data is essentially empty (all zeros) â use demo
+        // Check if data is essentially empty (all zeros) Ã¢ÂÂ use demo
         const isEmpty =
           json.sales.totalCalls === 0 &&
           json.sales.cashCollected === 0 &&
@@ -705,7 +699,7 @@ export default function Dashboard() {
     fetchData(password);
   };
 
-  // ââ Login Screen ââ
+  // Ã¢ÂÂÃ¢ÂÂ Login Screen Ã¢ÂÂÃ¢ÂÂ
   if (!authed && authError) {
     return (
       <div
@@ -773,7 +767,7 @@ export default function Dashboard() {
     );
   }
 
-  // ââ Loading Screen ââ
+  // Ã¢ÂÂÃ¢ÂÂ Loading Screen Ã¢ÂÂÃ¢ÂÂ
   if (loading && !data) {
     return (
       <div
@@ -806,7 +800,7 @@ export default function Dashboard() {
 
   if (!data) return null;
 
-  // ââ Dashboard ââ
+  // Ã¢ÂÂÃ¢ÂÂ Dashboard Ã¢ÂÂÃ¢ÂÂ
   return (
     <div style={{ maxWidth: 1280, margin: "0 auto", padding: "24px 24px 60px" }}>
       {/* Header */}
