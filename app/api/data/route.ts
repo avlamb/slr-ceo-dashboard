@@ -59,54 +59,114 @@ function transformData(
       s.toLowerCase().includes("youtube")
     )
   ).length;
-  const organicLeads = hyrosLeads.length - adLeads;ËÈ8¥ 8¥ Ø[Ý[]HYÜ[ÛH\ÜÈ]X][Û]H8¥ 8¥ ÛÛÝÝ[YÜ[H\ÜÐ]X][ÛYXÙJ
-Ý[N[X\][JHOÝ[H
-È
-]ÛÜÝ
-K
-NÂËÈZ[Ú[[XZÙÝÛÛH\ÜÈ]X][ÛÛÛÝÚ[[X\H]ÈX\Ý[ËÈXYÎ[X\ÈÜ[[X\ÈÛÚÙY[X\ÈÛÜÙY[X\O
-NÂ\ÜÐ]X][ÛÜXXÚ
+  const organicLeads = hyrosLeads.length - adLeads;
 
-][JHOÂÛÛÝÛÝ\ÙHH]ÛÝ\ÙH]Ø[\ZYÛÛ[YH[ÛÝÛÂÛÛÝ^\Ý[ÈHÚ[[X\Ù]
-ÛÝ\ÙJHÈXYÎÜ[ÛÚÙYÛÜÙYNÂ^\Ý[ËXYÈ
-ÏH]XYÈÂ^\Ý[ËÜ[
-ÏH]ÛÜÝÂ^\Ý[ËÛÜÙY
-ÏH]Ø[\ÈÂÚ[[X\Ù]
-ÛÝ\ÙK^\Ý[ÊNÂJNÂÛÛÝÚ[[ÈH\^KÛJÚ[[X\[Y\Ê
-JBX\
+  // ââ Calculate ad spend from Hyros attribution data ââ
+  const totalAdSpend = hyrosAttribution.reduce(
+    (sum: number, attr: any) => sum + (attr.cost || 0),
+    0
+  );
 
-Û[YK]WJHO
-Â[YKXYÎ]KXYËÜ[]KÜ[Ü]KXYÈÈ]KÜ[È]KXYÈÛÚÙY]KÛÚÙYÛÜÙY]KÛÜÙYJJBÛÜ
+  // Build channel breakdown from Hyros attribution
+  const channelMap = new Map<string, { leads: number; spend: number; booked: number; closed: number }>();
 
-KHOXYÈHKXYÊBÛXÙJ
-NÂËÈ8¥ 8¥ Ø[Ý[]H[[ÚX[Y]XÜÈ8¥ 8¥ ÛÛÝÝ[][YHH\ÜÔØ[\ËYXÙJ
-Ý[N[X\Î[JHOÝ[H
-È
-Ë[[Ý[
-K
-HØ\ÚÛÛXÝYÂÛÛÝY[ÈH^[Y[Ë[\
-[JHOÝ]\ÈOOHY[YNÂÛÛÝY[[[Ý[HY[ËYXÙJ
-Ý[N[X\[JHOÝ[H
-È
-[[Ý[
-K
-NÂËÈ8¥ 8¥ Z[\ÚØ\]H8¥ 8¥ ÛÛÝ\ÚØ\\ÚØ\]HHÂ\Ý\]YÝËÒTÓÔÝ[Ê
-K\[Ù	Û[Û[Y\ÖÛÝËÙ][Û
+  hyrosAttribution.forEach((attr: any) => {
+    const source = attr.source || attr.campaign_name || "Unknown";
+    const existing = channelMap.get(source) || { leads: 0, spend: 0, booked: 0, closed: 0 };
+    existing.leads += attr.leads || 0;
+    existing.spend += attr.cost || 0;
+    existing.closed += attr.sales || 0;
+    channelMap.set(source, existing);
+  });
 
-W_H	ÛÝËÙ][YX\
-_XØ[\ÎÂÝ[Ø[ÎÝ[ÜËÙ]ÐÛÚÙYX]Ý[
-Ý[ÜÈ
-KËÈ\Ý[X]HYÝXÚØXH\XÝBÚÝÔ]NÌËÈÚ[HY[YÚ]ÒØ[[\]BÛÜÙYX[ÎÛÜÙYÜË[ÝÛÜÙT]NÝ[ÜÈÈÛÜÙYÜË[ÝÈÝ[ÜÈØ\ÚÛÛXÝYØ\ÚÛÛXÝYÝ[][YK]ÑX[Ú^NÛÜÙYÜË[ÝÈ
-Ø\ÚÛÛXÝYÝ[][YJHÈÛÜÙYÜË[Ý\[[U[YNÜÂ[\
-Î[JHOËÝ]\ÈOOHÜ[BYXÙJ
-Ý[N[X\Î[JHOÝ[H
-È
-Ë[Û]\U[YH
-K
-KÙ]\ÐÛÜÙPÛÛ\Ú[ÛËÈYYÈÙ]\XÚÚ[ÂÛÜÙ\ËÙ]\Î×KËÈYYÈÒ\Ù\X\[ÂÙYZÛU[×KËÈYYÈÙYZÛHYÙÜYØ][ÛK[[Y[ÂXÝ]PÛY[ÎËÈYYÈÒÛÛXÝYÈ[\[Â]ÓÛØ\[ÜÎ]ÓÛØ\[Ñ^\ÎÛY[Ø]\ÙXÝ[ÛÚ\]NÚ\Y\Ó[Û][[Û]NÜÛ\ÎÂÈ[YN[\ZÙHXÝ]PÛY[ÎÛØ\Y]Ñ^\ÎØ]\ÙXÝ[ÛKÈ[YNX[Y]HX\Û^HXÝ]PÛY[ÎÛØ\Y]Ñ^\ÎØ]\ÙXÝ[ÛKK[ÛPÚ\×KK[[ÚX[Â\Ý[][YK\ÜÝÝÝ[][YSUÝ[][YKÚXÝY[ÛNÝ[][YH
-
-ÌÈÝËÙ]]J
-JKY[ÎY[[[Ý[Y[]NÝ[][YHÈY[[[Ý[ÈÝ[][YHËÈYYÈ\ÝÜXØ[Ø[Ý[][ÛØXÎ\ÜÓXYË[ÝÈÝ[YÜ[ÈÛÜÙYÜË[ÝØXÔ][Î[ÛT][YN×KK\ÂÝ[Ý]Ý[[ÎËÈYYÈ^[Y[Ý]\È[[\Ú\ÂÝ\[^\ÌÌ^\Í^\ÎL\ÎÛÛXÝ[Û]N]Ñ^\ÕÐÛÛXÝZ[Y^[Y[ÎZ[Y^[Y[[[Ý[^[Y[[XÝ]N^[Y[[[YNKX\Ù][ÎÂÝ[XYÎ\ÜÓXYË[ÝYXYËÜØ[XÓXYËYÜ[Ý[YÜ[ÛÜÝ\XYYXYÈÈÝ[YÜ[ÈYXYÈÛÜÝVXÜisition: closedOpps.length > 0 ? totalAdSpend / closedOpps.length : 0,
+  const channels = Array.from(channelMap.entries())
+    .map(([name, data]) => ({
+      name,
+      leads: data.leads,
+      spend: data.spend,
+      cpl: data.leads > 0 ? data.spend / data.leads : 0,
+      booked: data.booked,
+      closed: data.closed,
+    }))
+    .sort((a, b) => b.leads - a.leads)
+    .slice(0, 8);
+
+  // ââ Calculate financial metrics ââ
+  const totalRevenue = hyrosSales.reduce((sum: number, s: any) => sum + (s.amount || 0), 0) || cashCollected;
+  const refunds = payments.filter((p: any) => p.status === "refunded");
+  const refundAmount = refunds.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
+
+  // ââ Build dashboard data ââ
+  const dashboard: DashboardData = {
+    lastUpdated: now.toISOString(),
+    period: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
+
+    sales: {
+      totalCalls: totalOpps,
+      setsBooked: Math.round(totalOpps * 0.6), // Estimate if not trackable directly
+      showRate: 0.72, // Will be refined with GHL calendar data
+      closedDeals: closedOpps.length,
+      closeRate: totalOpps > 0 ? closedOpps.length / totalOpps : 0,
+      cashCollected: cashCollected || totalRevenue,
+      avgDealSize: closedOpps.length > 0 ? (cashCollected || totalRevenue) / closedOpps.length : 0,
+      pipelineValue: opps
+        .filter((o: any) => o.status === "open")
+        .reduce((sum: number, o: any) => sum + (o.monetaryValue || 0), 0),
+      setterToCloseConversion: 0, // Needs setter tracking
+      closers,
+      setters: [], // Needs GHL user mapping
+      weeklyTrend: [], // Needs weekly aggregation
+    },
+
+    fulfillment: {
+      activeClients: 0, // Needs GHL contact tag filtering
+      newOnboardings: 0,
+      avgOnboardingDays: 0,
+      clientSatisfaction: 0,
+      churnRate: 0,
+      churnedThisMonth: 0,
+      retentionRate: 0,
+      csms: [
+        { name: "Philip Blake", activeClients: 0, onboarded: 0, avgDays: 0, satisfaction: 0 },
+        { name: "Juanyetta Beasley", activeClients: 0, onboarded: 0, avgDays: 0, satisfaction: 0 },
+      ],
+      monthlyChurn: [],
+    },
+
+    financial: {
+      mrr: totalRevenue,
+      mrrGrowth: 0,
+      totalRevenueMTD: totalRevenue,
+      projectedMonthly: totalRevenue * (30 / now.getDate()),
+      refunds: refundAmount,
+      refundRate: totalRevenue > 0 ? refundAmount / totalRevenue : 0,
+      ltv: 0, // Needs historical calculation
+      cac: hyrosLeads.length > 0 ? totalAdSpend / closedOpps.length : 0,
+      ltvCacRatio: 0,
+      monthlyRevenue: [],
+    },
+
+    ar: {
+      totalOutstanding: 0, // Needs payment status analysis
+      current: 0,
+      days30: 0,
+      days60: 0,
+      days90plus: 0,
+      collectionRate: 0,
+      avgDaysToCollect: 0,
+      failedPayments: 0,
+      failedPaymentAmount: 0,
+      paymentPlanActive: 0,
+      paymentPlanValue: 0,
+    },
+
+    marketing: {
+      totalLeads: hyrosLeads.length,
+      adLeads,
+      organicLeads,
+      adSpend: totalAdSpend,
+      costPerLead: adLeads > 0 ? totalAdSpend / adLeads : 0,
+      costPerAcquisition: closedOpps.length > 0 ? totalAdSpend / closedOpps.length : 0,
       roas: totalAdSpend > 0 ? totalRevenue / totalAdSpend : 0,
       adCallsBooked: 0,
       organicCallsBooked: 0,
@@ -122,7 +182,7 @@ JKY[ÎY[[[Ý[Y[]NÝ[][
   return dashboard;
 }
 
-// âââ API Route Handler ââââââââââââââââââââââââââââââââââââââââââââââââââ
+// âââ API Route Handler âââââââââââââââââââââââââââââââââââââââââââââââââ
 
 export async function GET(request: Request) {
   // Simple password auth via query param or header
