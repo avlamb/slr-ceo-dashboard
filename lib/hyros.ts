@@ -1,7 +1,7 @@
 import { getCached, setCache, CACHE_TTL } from "./cache";
 
-// Correct base: /v1/api — endpoints are GET-based with ?from=&to= query params
-const HYROS_BASE = "https://api.hyros.com/v1/api";
+// Base: https://api.hyros.com/v1 — endpoints at /api/v1.0/*, date params: fromDate/toDate
+const HYROS_BASE = "https://api.hyros.com/v1";
 
 async function hyrosFetch(endpoint: string) {
   const apiKey = process.env.HYROS_API_KEY;
@@ -28,8 +28,8 @@ export async function getLeads(startDate?: string, endDate?: string) {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  const qs = startDate && endDate ? `?from=${startDate}&to=${endDate}` : "";
-  const data = await hyrosFetch(`/retrieve/leads${qs}`);
+  const qs = startDate && endDate ? `?fromDate=${startDate}&toDate=${endDate}` : "";
+  const data = await hyrosFetch(`/api/v1.0/leads${qs}`);
   setCache(cacheKey, data, CACHE_TTL.HYROS);
   return data;
 }
@@ -40,8 +40,8 @@ export async function getSales(startDate?: string, endDate?: string) {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  const qs = startDate && endDate ? `?from=${startDate}&to=${endDate}` : "";
-  const data = await hyrosFetch(`/retrieve/sales${qs}`);
+  const qs = startDate && endDate ? `?fromDate=${startDate}&toDate=${endDate}` : "";
+  const data = await hyrosFetch(`/api/v1.0/sales${qs}`);
   setCache(cacheKey, data, CACHE_TTL.HYROS);
   return data;
 }
@@ -52,8 +52,8 @@ export async function getCalls(startDate?: string, endDate?: string) {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  const qs = startDate && endDate ? `?from=${startDate}&to=${endDate}` : "";
-  const data = await hyrosFetch(`/retrieve/calls${qs}`);
+  const qs = startDate && endDate ? `?fromDate=${startDate}&toDate=${endDate}` : "";
+  const data = await hyrosFetch(`/api/v1.0/calls${qs}`);
   setCache(cacheKey, data, CACHE_TTL.HYROS);
   return data;
 }
@@ -64,8 +64,8 @@ export async function getAdAttribution(startDate?: string, endDate?: string) {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  const qs = startDate && endDate ? `?from=${startDate}&to=${endDate}` : "";
-  const data = await hyrosFetch(`/attribution/ads${qs}`);
+  const qs = startDate && endDate ? `?startDate=${startDate}&endDate=${endDate}` : "";
+  const data = await hyrosFetch(`/api/v1.0/attribution${qs}`);
   setCache(cacheKey, data, CACHE_TTL.HYROS);
   return data;
 }
@@ -76,8 +76,8 @@ export async function getSources(startDate?: string, endDate?: string) {
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  const qs = startDate && endDate ? `?from=${startDate}&to=${endDate}` : "";
-  const data = await hyrosFetch(`/attribution/sources${qs}`);
+  const qs = startDate && endDate ? `?fromDate=${startDate}&toDate=${endDate}` : "";
+  const data = await hyrosFetch(`/api/v1.0/sources${qs}`);
   setCache(cacheKey, data, CACHE_TTL.HYROS);
   return data;
 }
