@@ -209,7 +209,7 @@ export async function getCalendarAppointmentsCurrentMonth(
   total: number;
   perCalendar: Array<{ name: string; count: number }>;
   perUser: Array<{ name: string; count: number }>;
-  _debug?: { mapSize: number; uniqueUserIds: number; firstEvtKeys: string[] };
+  _debug?: { mapSize: number; uniqueUserIds: number; firstEvtKeys: string[]; firstAssignedResources?: any[] };
 }> {
   const cacheKey = `ghl_cal_appts_${startDate}`;
   const cached = getCached<any>(cacheKey);
@@ -267,6 +267,12 @@ export async function getCalendarAppointmentsCurrentMonth(
           evt.assignedUserId || evt.userId || evt.users?.[0]?.id;
         if (!userId) continue;
         uniqueUserIds.add(userId);
+        // Extract name from assignedResources if available (avoids needing Users API)
+        const resource: any = evt.assignedResources?.[0];
+        if (resource?.id) {
+          const rName = resource.name || [resource.firstName, resource.lastName].filter(Boolean).join(" ").trim();
+          if (rName) userIdToName.set(resource.id, rName);
+        }
         userIdCountMap.set(userId, (userIdCountMap.get(userId) || 0) + 1);
       }
     });
@@ -291,7 +297,7 @@ export async function getCalendarAppointmentsCurrentMonth(
     .filter(({ name }) => !CSM_NAME_PATTERNS.some((p) => name.toLowerCase().includes(p)))
     .sort((a, b) => b.count - a.count);
 
-  const result = { total, perCalendar, perUser, _debug: { mapSize: userIdToName.size, uniqueUserIds: uniqueUserIds.size, firstEvtKeys: firstEventSample ? Object.keys(firstEventSample) : [] } };
+  const result = { total, perCalendar, perUser, _debug: { mapSize: userIdToName.size, uniqueUserIds: uniqueUserIds.size, firstEvtKeys: firstEventSample ? Object.keys(firstEventSample) : [], firstAssignedResources: firstEventSample?.assignedResources } };
   setCache(cacheKey, result, CACHE_TTL.GHL);
   return result;
 }
