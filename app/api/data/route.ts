@@ -100,7 +100,7 @@ function transformSheetData(
 
   // ── Build closers array ──
   const closers: CloserMetrics[] = Array.from(
-    new Set([...closerDealsMap.keys(), ...closerCallMap.keys()])
+    new Set([...Array.from(closerDealsMap.keys()), ...Array.from(closerCallMap.keys())])
   )
     .map((name) => {
       const d = closerDealsMap.get(name) || { closes: 0, revenue: 0 };
