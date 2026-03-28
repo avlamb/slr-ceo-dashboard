@@ -24,7 +24,12 @@ function transformData(
   const wonOpps: any[] = (ghl?.wonOpportunities as any[]) || [];
   const closedOpps = wonOpps.length > 0 ? wonOpps : opps.filter((o: any) => o.status === "won");
   const totalOpps = opps.length;
-  const cashCollected = closedOpps.reduce((sum: number, o: any) => sum + (o.monetaryValue || 0), 0);
+  // "Cash Collected" is stored in the single numeric custom field on each opportunity.
+  // monetaryValue = full program price (contract value); fieldValueNumber = actual cash received.
+  const cashCollected = closedOpps.reduce((sum: number, o: any) => {
+    const cashField = (o.customFields || []).find((f: any) => f.type === "number");
+    return sum + (cashField?.fieldValueNumber ?? o.monetaryValue ?? 0);
+  }, 0);
 
   // Group by assignedTo for closer metrics
   const closerMap = new Map<string, { calls: number; closes: number; revenue: number }>();
