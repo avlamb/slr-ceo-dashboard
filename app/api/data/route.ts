@@ -334,6 +334,10 @@ export async function GET() {
     calendarResult.status === "fulfilled" && calendarResult.value
       ? calendarResult.value.total
       : undefined;
+  const ghlPerCalendar =
+    calendarResult.status === "fulfilled" && calendarResult.value
+      ? calendarResult.value.perCalendar
+      : [];
 
   const dashboard = transformSheetData(
     closer,
@@ -346,5 +350,5 @@ export async function GET() {
 
   setCache("dashboard_sheets", dashboard, CACHE_TTL.SHEETS);
 
-  return NextResponse.json(dashboard);
+  return NextResponse.json({ ...dashboard, _ghlCalendars: ghlPerCalendar });
 }
