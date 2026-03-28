@@ -286,6 +286,11 @@ export async function getCalendarAppointmentsCurrentMonth(
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
 
+  // DEBUG: log user/event data to Vercel function logs
+  console.log('[GHL_DEBUG] usersCount:', usersData?.users?.length ?? 0, 'idMapSize:', userIdToName.size);
+  const _dbgEvt = calResults[0]?.events?.[0] as Record<string, unknown> | undefined;
+  console.log('[GHL_DEBUG] firstEvtKeys:', _dbgEvt ? Object.keys(_dbgEvt).slice(0,15).join(',') : 'none');
+  console.log('[GHL_DEBUG] firstEvtUserId:', _dbgEvt?.assignedUserId ?? 'undef', _dbgEvt?.userId ?? 'undef');
   const result = { total, perCalendar, perUser };
   setCache(cacheKey, result, CACHE_TTL.GHL);
   return result;
