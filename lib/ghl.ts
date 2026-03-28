@@ -227,12 +227,10 @@ export async function getCalendarAppointmentsCurrentMonth(
   const calendarsData = await getCalendars();
   const allCalendars: any[] = calendarsData?.calendars || [];
 
-  const bookingCalendars = allCalendars.filter((cal: any) => {
-    const name = (cal.name || "").toLowerCase();
-    if (name.includes("personal calendar")) return false;
-    if (CSM_NAME_PATTERNS.some((p) => name.includes(p))) return false;
-    return true;
-  });
+  const bookingCalendars = allCalendars.filter(
+    // Only fetch events from paid (*) + organic calendars — reduces ~15 GHL calls to 2
+    (cal: any) => cal.name.includes("*") || /^organic/i.test(cal.name.trim())
+  );
 
   // Build userId -> name map for per-closer attribution
   const usersData = await getUsers();
