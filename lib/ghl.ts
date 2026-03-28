@@ -175,7 +175,7 @@ export async function getUsers() {
   if (cached) return cached;
 
   try {
-    const data = await ghlFetch(`/users/?locationId=${process.env.GHL_LOCATION_ID ?? ""}`);
+    const data = await ghlFetch("/users/");
     setCache(cacheKey, data, CACHE_TTL.GHL);
     return data;
   } catch (err) {
@@ -209,7 +209,7 @@ export async function getCalendarAppointmentsCurrentMonth(
   total: number;
   perCalendar: Array<{ name: string; count: number }>;
   perUser: Array<{ name: string; count: number }>;
-  _debug?: { usersCount: number; mapSize: number; firstEvtKeys: string[] };
+  _debug?: { usersCount: number; mapSize: number; firstEvtKeys: string[]; usersDataKeys: string[] };
 }> {
   const cacheKey = `ghl_cal_appts_${startDate}`;
   const cached = getCached<any>(cacheKey);
@@ -236,7 +236,7 @@ export async function getCalendarAppointmentsCurrentMonth(
   // Build userId -> name map for per-closer attribution
   const usersData = await getUsers();
   const userIdToName = new Map<string, string>();
-  for (const u of usersData?.users || []) {
+  for (const u of (usersData?.users ?? usersData?.data ?? usersData?.results ?? []) as any[]) {
     const name = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
     if (name) userIdToName.set(u.id, name);
   }
@@ -289,7 +289,7 @@ export async function getCalendarAppointmentsCurrentMonth(
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
 
-  const result = { total, perCalendar, perUser, _debug: { usersCount: usersData?.users?.length ?? 0, mapSize: userIdToName.size, firstEvtKeys: firstEventSample ? Object.keys(firstEventSample) : [] } };
+  const result = { total, perCalendar, perUser, _debug: { usersCount: usersData?.users?.length ?? 0, mapSize: userIdToName.size, firstEvtKeys: firstEventSample ? Object.keys(firstEventSample) : [], usersDataKeys: usersData ? Object.keys(usersData) : [] } };
   setCache(cacheKey, result, CACHE_TTL.GHL);
   return result;
 }
