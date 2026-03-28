@@ -10,7 +10,7 @@
  *   - SLR 2026 Setter Tracker           → setter KPIs
  *   - SLR Deals Master List             → per-rep breakdown, AR
  *   - SLR Projection Dashboard 2026     → cash vs projection vs pace
- *   - GoHighLevel Calendar API          → real appointment counts (totalCalls override)
+ *   - GoHighLevel Calendar API          → real appointment counts (totalCalls + per-closer)
  */
 
 import { NextResponse } from "next/server";
@@ -32,6 +32,40 @@ import type {
 
 export const dynamic = "force-dynamic";
 
+type CalendarEntry = { name: string; count: number };
+
+// ─── Fuzzy-match a closer name to a GHL calendar entry ────────────────────────
+// Strategy: split closer name into tokens (≥3 chars), require ALL tokens to
+// appear in the calendar name. Falls back to any-single-token match if needed.
+function matchCalendar(
+  closerName: string,
+  calendars: CalendarEntry[]
+): number {
+  const lower = closerName.toLowerCase().trim();
+  const tokens = lower.split(/\s+/).filter((t) => t.length >= 3);
+  if (tokens.length === 0) return 0;
+
+  // 1. Exact substring match (full name in calendar name)
+  for (const cal of calendars) {
+    if (cal.name.toLowerCase().includes(lower)) return cal.count;
+  }
+
+  // 2. All-token match (every part of the name appears somewhere in cal name)
+  if (tokens.length > 1) {
+    for (const cal of calendars) {
+      const cn = cal.name.toLowerCase();
+      if (tokens.every((t) => cn.includes(t))) return cal.count;
+    }
+  }
+
+  // 3. First-name match (first token only — less precise, last resort)
+  for (const cal of calendars) {
+    if (cal.name.toLowerCase().includes(tokens[0])) return cal.count;
+  }
+
+  return 0;
+}
+
 // ─── Transform sheets data → DashboardData ─────────────────────────────────────
 function transformSheetData(
   closer: Awaited<ReturnType<typeof fetchAllSheetData>>["closer"],
@@ -39,7 +73,8 @@ function transformSheetData(
   deals: Awaited<ReturnType<typeof fetchAllSheetData>>["deals"],
   projection: Awaited<ReturnType<typeof fetchAllSheetData>>["projection"],
   errors: DataSourceError[],
-  ghlCalendarTotal?: number
+  ghlCalendarTotal?: number,
+  ghlPerCalendar?: CalendarEntry[]
 ): DashboardData {
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -76,8 +111,6 @@ function transformSheetData(
   }
 
   // ── Supplement closer call counts from Leaderboard tab ──
-  // Leaderboard: row 0 = headers, rows 1+ = reps
-  // Find "Name" and call/schedule column by header text
   const closerCallMap = new Map<string, number>();
   if (closer?.leaderboard && closer.leaderboard.length > 1) {
     const headers = (closer.leaderboard[0] || []).map((h) =>
@@ -95,6 +128,23 @@ function transformSheetData(
         const calls = num(row[callCol]);
         if (name && calls > 0) closerCallMap.set(name, calls);
       });
+    }
+  }
+
+  // ── Override per-closer call counts with GHL calendar data (real-time) ──
+  const cals = ghlPerCalendar ?? [];
+  if (cals.length > 0) {
+    // Override existing sheet-sourced call counts
+    for (const [name] of closerCallMap) {
+      const ghlCount = matchCalendar(name, cals);
+      if (ghlCount > 0) closerCallMap.set(name, ghlCount);
+    }
+    // Add closers from Deals that have no leaderboard entry
+    for (const [name] of closerDealsMap) {
+      if (!closerCallMap.has(name)) {
+        const ghlCount = matchCalendar(name, cals);
+        if (ghlCount > 0) closerCallMap.set(name, ghlCount);
+      }
     }
   }
 
@@ -154,7 +204,6 @@ function transformSheetData(
     revenue: h.cashCollected,
   }));
 
-  // Use monthly history as period trend (labeled by month abbreviation)
   const weeklyTrend = (closer?.history || []).map((h) => ({
     week: h.month,
     revenue: h.cashCollected,
@@ -181,14 +230,13 @@ function transformSheetData(
       .forEach((d) => {
         paymentPlansActive++;
         paymentPlanValue += d.dealValue;
-        // Extract deposit amount from payment plan string, subtract from outstanding
         const depositMatch = d.paymentPlan.match(/\$?([\d,]+)\s*(down|deposit)/i);
         const deposit = depositMatch ? money(depositMatch[1]) : 0;
         arOutstanding += Math.max(d.dealValue - deposit, 0);
       });
   }
 
-  // ── MRR growth: compare current month vs previous month ──
+  // ── MRR growth ──
   const hist = closer?.history || [];
   let mrrGrowth = 0;
   if (hist.length >= 2) {
@@ -197,7 +245,6 @@ function transformSheetData(
     mrrGrowth = prev > 0 ? (curr - prev) / prev : 0;
   }
 
-  // ── Core values ──
   const cashCollected =
     projection?.cashActual || closer?.current?.cashCollected || 0;
   const closes = closer?.current?.closes || 0;
@@ -207,7 +254,6 @@ function transformSheetData(
     period,
 
     sales: {
-      // Prefer GHL calendar appointments (real-time); fall back to sheet's scheduled calls
       totalCalls: ghlCalendarTotal ?? closer?.current?.scheduledCalls ?? 0,
       setsBooked:
         setter?.current?.setsOnCalendar ?? setter?.current?.sets ?? 0,
@@ -299,7 +345,6 @@ function transformSheetData(
 
 // ─── Route Handler ─────────────────────────────────────────────────────────────
 export async function GET() {
-  // No service account key → clear error
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
     return NextResponse.json(
       {
@@ -310,11 +355,12 @@ export async function GET() {
     );
   }
 
-  // Cache check
-  const cached = getCached<DashboardData>("dashboard_sheets");
+  // Cache check — stored with _ghlCalendars so both paths return it
+  const cached = getCached<DashboardData & { _ghlCalendars: CalendarEntry[] }>(
+    "dashboard_sheets"
+  );
   if (cached) return NextResponse.json(cached);
 
-  // Fetch all 4 sheets + GHL calendar in parallel
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
@@ -334,7 +380,8 @@ export async function GET() {
     calendarResult.status === "fulfilled" && calendarResult.value
       ? calendarResult.value.total
       : undefined;
-  const ghlPerCalendar =
+
+  const ghlPerCalendar: CalendarEntry[] =
     calendarResult.status === "fulfilled" && calendarResult.value
       ? calendarResult.value.perCalendar
       : [];
@@ -345,10 +392,13 @@ export async function GET() {
     deals,
     projection,
     errors as DataSourceError[],
-    ghlCalendarTotal
+    ghlCalendarTotal,
+    ghlPerCalendar
   );
 
-  setCache("dashboard_sheets", dashboard, CACHE_TTL.SHEETS);
+  // Store with _ghlCalendars so cached responses also include it
+  const fullResponse = { ...dashboard, _ghlCalendars: ghlPerCalendar };
+  setCache("dashboard_sheets", fullResponse, CACHE_TTL.SHEETS);
 
-  return NextResponse.json({ ...dashboard, _ghlCalendars: ghlPerCalendar });
+  return NextResponse.json(fullResponse);
 }
