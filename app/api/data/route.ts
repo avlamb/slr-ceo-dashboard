@@ -22,7 +22,23 @@ function transformData(
 
   // wonOpportunities: paginated all won deals for current month
   const wonOpps: any[] = (ghl?.wonOpportunities as any[]) || [];
-  const closedOpps = wonOpps.length > 0 ? wonOpps : opps.filter((o: any) => o.status === "won");
+  const allWonOpps = wonOpps.length > 0 ? wonOpps : opps.filter((o: any) => o.status === "won");
+
+  // Filter to deals in a "Closed" stage — closers sometimes mark won without moving stage
+  // (e.g. deals left in Hotlist, Booked, etc. should not count toward cash collected)
+  const closedStageIds = new Set<string>(
+    (ghl?.pipelines?.pipelines || []).flatMap((p: any) =>
+      (p.stages || [])
+        .filter((s: any) => {
+          const n = (s.name || "").toLowerCase();
+          return n === "closed" || n === "closed - won";
+        })
+        .map((s: any) => s.id as string)
+    )
+  );
+  const closedOpps = closedStageIds.size > 0
+    ? allWonOpps.filter((o: any) => closedStageIds.has(o.pipelineStageId))
+    : allWonOpps;
   const totalOpps = opps.length;
   // "Cash Collected" is stored in the single numeric custom field on each opportunity.
   // monetaryValue = full program price (contract value); fieldValueNumber = actual cash received.
