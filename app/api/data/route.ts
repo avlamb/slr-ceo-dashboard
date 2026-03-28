@@ -37,6 +37,26 @@ type CalendarEntry = { name: string; count: number };
 // ─── Fuzzy-match a closer name to a GHL calendar entry ────────────────────────
 // Strategy: split closer name into tokens (≥3 chars), require ALL tokens to
 // appear in the calendar name. Falls back to any-single-token match if needed.
+const NICKNAMES: Record<string, string[]> = {
+  gabriel: ["gabe"],
+  gabe: ["gabriel"],
+  dan: ["daniel"],
+  daniel: ["dan"],
+  nate: ["nathan", "nathaniel"],
+  nathan: ["nate"],
+};
+
+function expandName(tokens: string[]): string[] {
+  const expanded = new Set(tokens);
+  for (const t of tokens) {
+    const alts = NICKNAMES[t];
+    if (alts) alts.forEach((a) => expanded.add(a));
+  }
+  return Array.from(expanded);
+}
+
+// ─── Fuzzy-match a closer name to a GHL calendar entry ────────────────────────
+// 3-tier: exact → all-token (nickname-expanded) → scored first-name fallback.
 function matchCalendar(
   closerName: string,
   calendars: CalendarEntry[]
@@ -44,26 +64,35 @@ function matchCalendar(
   const lower = closerName.toLowerCase().trim();
   const tokens = lower.split(/\s+/).filter((t) => t.length >= 3);
   if (tokens.length === 0) return 0;
+  const expanded = expandName(tokens);
 
-  // 1. Exact substring match (full name in calendar name)
+  // 1. Exact substring match
   for (const cal of calendars) {
     if (cal.name.toLowerCase().includes(lower)) return cal.count;
   }
 
-  // 2. All-token match (every part of the name appears somewhere in cal name)
-  if (tokens.length > 1) {
+  // 2. All-token match (nickname-expanded)
+  if (expanded.length > 1) {
     for (const cal of calendars) {
       const cn = cal.name.toLowerCase();
-      if (tokens.every((t) => cn.includes(t))) return cal.count;
+      if (expanded.every((t) => cn.includes(t))) return cal.count;
     }
   }
 
-  // 3. First-name match (first token only — less precise, last resort)
+  // 3. Scored first-name fallback — picks best match when multiple cals share first name
+  const firstAlts = expandName([tokens[0]]);
+  let best: { count: number; score: number } | null = null;
   for (const cal of calendars) {
-    if (cal.name.toLowerCase().includes(tokens[0])) return cal.count;
+    const cn = cal.name.toLowerCase();
+    if (!firstAlts.some((fn) => cn.includes(fn))) continue;
+    let score = 1;
+    for (const t of tokens.slice(1)) {
+      if (cn.includes(t)) score += 2;
+      else if (new RegExp("[ -]" + t[0] + "(?:[ -]|$)").test(cn)) score += 1;
+    }
+    if (!best || score > best.score) best = { count: cal.count, score };
   }
-
-  return 0;
+  return best?.count ?? 0;
 }
 
 // ─── Transform sheets data → DashboardData ─────────────────────────────────────
@@ -377,15 +406,19 @@ export async function GET() {
       ? sheetsResult.value
       : { closer: null, setter: null, deals: null, projection: null, errors: [] };
 
-  const ghlCalendarTotal =
-    calendarResult.status === "fulfilled" && calendarResult.value
-      ? calendarResult.value.total
-      : undefined;
-
   const ghlPerCalendar: CalendarEntry[] =
     calendarResult.status === "fulfilled" && calendarResult.value
       ? calendarResult.value.perCalendar
       : [];
+
+  // Identify paid (self-book, has *) and organic calendars for separate tracking
+  const paidCal = ghlPerCalendar.find((c) => c.name.includes("*"));
+  const organicCal = ghlPerCalendar.find((c) => /^organic/i.test(c.name.trim()));
+  const callsPaid = paidCal?.count ?? 0;
+  const callsOrganic = organicCal?.count ?? 0;
+  // totalCalls = paid + organic (avoids double-counting setter/aggregate calendars)
+  const ghlCalendarTotal =
+    callsPaid + callsOrganic > 0 ? callsPaid + callsOrganic : undefined;
 
   const dashboard = transformSheetData(
     closer,
@@ -398,7 +431,7 @@ export async function GET() {
   );
 
   // Store with _ghlCalendars so cached responses also include it
-  const fullResponse = { ...dashboard, _ghlCalendars: ghlPerCalendar };
+  const fullResponse = { ...dashboard, _ghlCalendars: ghlPerCalendar, callsPaid, callsOrganic };
   setCache("dashboard_sheets", fullResponse, CACHE_TTL.SHEETS);
 
   return NextResponse.json(fullResponse);
