@@ -146,7 +146,7 @@ function transformSheetData(
         if (ghlCount > 0) closerCallMap.set(name, ghlCount);
       }
     });
-  }
+
   }
 
   // ── Build closers array ──
