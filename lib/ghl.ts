@@ -205,7 +205,11 @@ export async function getCalendars() {
 // Batched in groups of 10 to avoid overwhelming the API.
 export async function getCalendarAppointmentsCurrentMonth(
   startDate: string
-): Promise<{ total: number; perCalendar: Array<{ name: string; count: number }> }> {
+): Promise<{
+  total: number;
+  perCalendar: Array<{ name: string; count: number }>;
+  perUser: Array<{ name: string; count: number }>;
+}> {
   const cacheKey = `ghl_cal_appts_${startDate}`;
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
@@ -230,9 +234,19 @@ export async function getCalendarAppointmentsCurrentMonth(
     return true;
   });
 
+  // Build userId -> name map for per-closer attribution
+  const usersData = await getUsers();
+  const userIdToName = new Map<string, string>();
+  for (const u of usersData?.users || []) {
+    const name = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
+    if (name) userIdToName.set(u.id, name);
+  }
+
   // Fetch event counts in batches of 10 (parallel within each batch)
+  // Also collect events for per-user attribution
   const BATCH_SIZE = 10;
   const perCalendar: Array<{ name: string; count: number }> = [];
+  const userCountMap = new Map<string, number>(); // userName -> count
 
   for (let i = 0; i < bookingCalendars.length; i += BATCH_SIZE) {
     const batch = bookingCalendars.slice(i, i + BATCH_SIZE);
@@ -245,18 +259,36 @@ export async function getCalendarAppointmentsCurrentMonth(
             Version: "2021-07-28",
           },
         });
-        if (!res.ok) return { name: cal.name, count: 0 };
+        if (!res.ok) return { name: cal.name, count: 0, events: [] as any[] };
         const data = await res.json();
-        return { name: cal.name, count: (data?.events || []).length };
+        const events: any[] = data?.events || [];
+        return { name: cal.name, count: events.length, events };
       })
     );
     results.forEach((r) => {
-      if (r.status === "fulfilled") perCalendar.push(r.value);
+      if (r.status !== "fulfilled") return;
+      const { name, count, events } = r.value;
+      perCalendar.push({ name, count });
+      // Attribute each appointment to its assigned user
+      for (const evt of events) {
+        const userId: string | undefined =
+          evt.assignedUserId || evt.userId || evt.users?.[0]?.id;
+        if (!userId) continue;
+        const userName = userIdToName.get(userId);
+        if (!userName) continue;
+        // Skip CSMs
+        if (CSM_NAME_PATTERNS.some((p) => userName.toLowerCase().includes(p))) continue;
+        userCountMap.set(userName, (userCountMap.get(userName) || 0) + 1);
+      }
     });
   }
 
   const total = perCalendar.reduce((sum, c) => sum + c.count, 0);
-  const result = { total, perCalendar };
+  const perUser = Array.from(userCountMap.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+
+  const result = { total, perCalendar, perUser };
   setCache(cacheKey, result, CACHE_TTL.GHL);
   return result;
 }
