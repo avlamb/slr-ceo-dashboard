@@ -1,4 +1,4 @@
-
+import { getCached, setCache, CACHE_TTL } from "./cache";
 const GHL_BASE = "https://services.leadconnectorhq.com";
 
 // GHL v2 API has strict schema validation per endpoint:
