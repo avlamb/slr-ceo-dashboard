@@ -135,17 +135,18 @@ function transformSheetData(
   const cals = ghlPerCalendar ?? [];
   if (cals.length > 0) {
     // Override existing sheet-sourced call counts
-    for (const [name] of closerCallMap) {
+    closerCallMap.forEach((_v, name) => {
       const ghlCount = matchCalendar(name, cals);
       if (ghlCount > 0) closerCallMap.set(name, ghlCount);
-    }
+    });
     // Add closers from Deals that have no leaderboard entry
-    for (const [name] of closerDealsMap) {
+    closerDealsMap.forEach((_v, name) => {
       if (!closerCallMap.has(name)) {
         const ghlCount = matchCalendar(name, cals);
         if (ghlCount > 0) closerCallMap.set(name, ghlCount);
       }
-    }
+    });
+  }
   }
 
   // ── Build closers array ──
