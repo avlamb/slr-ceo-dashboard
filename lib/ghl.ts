@@ -209,6 +209,7 @@ export async function getCalendarAppointmentsCurrentMonth(
   total: number;
   perCalendar: Array<{ name: string; count: number }>;
   perUser: Array<{ name: string; count: number }>;
+  _debug?: { usersCount: number; mapSize: number; firstEvtKeys: string[] };
 }> {
   const cacheKey = `ghl_cal_appts_${startDate}`;
   const cached = getCached<any>(cacheKey);
@@ -243,6 +244,7 @@ export async function getCalendarAppointmentsCurrentMonth(
   // Fetch event counts in batches of 10 (parallel within each batch)
   // Also collect events for per-user attribution
   const BATCH_SIZE = 10;
+  let firstEventSample: any = null;
   const perCalendar: Array<{ name: string; count: number }> = [];
   const userCountMap = new Map<string, number>(); // userName -> count
 
@@ -267,6 +269,7 @@ export async function getCalendarAppointmentsCurrentMonth(
       if (r.status !== "fulfilled") return;
       const { name, count, events } = r.value;
       perCalendar.push({ name, count });
+      if (!firstEventSample && events.length > 0) firstEventSample = events[0];
       // Attribute each appointment to its assigned user
       for (const evt of events) {
         const userId: string | undefined =
@@ -286,13 +289,7 @@ export async function getCalendarAppointmentsCurrentMonth(
     .map(([name, count]) => ({ name, count }))
     .sort((a, b) => b.count - a.count);
 
-  // DEBUG: log user/event data
-  console.log('[GHL_DEBUG] usersCount:', usersData?.users?.length ?? 0, 'mapSize:', userIdToName.size);
-  const _dbgEvts = results[0]?.events;
-  if (_dbgEvts && _dbgEvts.length > 0) {
-    console.log('[GHL_DEBUG] firstEvt:', JSON.stringify(_dbgEvts[0]).slice(0, 300));
-  }
-  const result = { total, perCalendar, perUser };
+  const result = { total, perCalendar, perUser, _debug: { usersCount: usersData?.users?.length ?? 0, mapSize: userIdToName.size, firstEvtKeys: firstEventSample ? Object.keys(firstEventSample) : [] } };
   setCache(cacheKey, result, CACHE_TTL.GHL);
   return result;
 }
