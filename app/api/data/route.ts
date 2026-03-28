@@ -386,7 +386,7 @@ export async function GET() {
   }
 
   // Cache check — stored with _ghlCalendars so both paths return it
-  const cached = getCached<DashboardData & { _ghlCalendars: CalendarEntry[] }>(
+  const cached = getCached<DashboardData & { _ghlCalendars: CalendarEntry[]; _ghlUsers: CalendarEntry[]; callsPaid: number; callsOrganic: number }>(
     "dashboard_sheets"
   );
   if (cached) return NextResponse.json(cached);
@@ -420,6 +420,11 @@ export async function GET() {
   const ghlCalendarTotal =
     callsPaid + callsOrganic > 0 ? callsPaid + callsOrganic : undefined;
 
+  const ghlPerUser: CalendarEntry[] =
+    calendarResult.status === "fulfilled" && calendarResult.value
+      ? (calendarResult.value.perUser ?? [])
+      : [];
+
   const dashboard = transformSheetData(
     closer,
     setter,
@@ -427,11 +432,12 @@ export async function GET() {
     projection,
     errors as DataSourceError[],
     ghlCalendarTotal,
-    ghlPerCalendar
+    ghlPerCalendar,
+    ghlPerUser
   );
 
   // Store with _ghlCalendars so cached responses also include it
-  const fullResponse = { ...dashboard, _ghlCalendars: ghlPerCalendar, callsPaid, callsOrganic };
+  const fullResponse = { ...dashboard, _ghlCalendars: ghlPerCalendar, _ghlUsers: ghlPerUser, callsPaid, callsOrganic };
   setCache("dashboard_sheets", fullResponse, CACHE_TTL.SHEETS);
 
   return NextResponse.json(fullResponse);
