@@ -14,6 +14,8 @@ import type {
 } from "@/lib/types";
 import { DEMO_DATA } from "@/lib/demo-data";
 
+type ApiData = DashboardData & { callsPaid?: number; callsOrganic?: number };
+
 // ─── Design Tokens ──────────────────────────────────────────────────────────
 const T = {
   bg: "#0f1117",
@@ -179,12 +181,36 @@ function HorizontalStackedBar({ segments }: { segments: { label: string; value: 
 function DataTable({
   columns,
   rows,
+  defaultSort,
+  defaultDir = "desc",
 }: {
   columns: { key: string; label: string; align?: "left" | "right"; format?: (v: any) => string; colorFn?: (v: any) => string | undefined }[];
   rows: Record<string, any>[];
+  defaultSort?: string;
+  defaultDir?: "asc" | "desc";
 }) {
+  const [sortKey, setSortKey] = useState<string | null>(defaultSort ?? null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">(defaultDir);
+
+  const sorted = sortKey
+    ? [...rows].sort((a, b) => {
+        const av = a[sortKey], bv = b[sortKey];
+        if (typeof av === "number" && typeof bv === "number")
+          return sortDir === "desc" ? bv - av : av - bv;
+        return sortDir === "desc"
+          ? String(bv ?? "").localeCompare(String(av ?? ""))
+          : String(av ?? "").localeCompare(String(bv ?? ""));
+      })
+    : rows;
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    else { setSortKey(key); setSortDir("desc"); }
+  };
+
   if (!rows.length)
     return <div style={{ color: T.muted, padding: 16, textAlign: "center" }}>No data available</div>;
+
   const cellStyle = (align?: string): React.CSSProperties => ({
     padding: "10px 12px",
     textAlign: (align || "left") as any,
@@ -192,34 +218,45 @@ function DataTable({
     borderBottom: `1px solid ${T.border}`,
     fontSize: 13,
   });
+
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
-            {columns.map((col) => (
-              <th
-                key={col.key}
-                style={{
-                  ...cellStyle(col.align),
-                  color: T.muted,
-                  fontWeight: 600,
-                  fontSize: 11,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                {col.label}
-              </th>
-            ))}
+            {columns.map((col) => {
+              const isSorted = sortKey === col.key;
+              return (
+                <th
+                  key={col.key}
+                  onClick={() => toggleSort(col.key)}
+                  style={{
+                    ...cellStyle(col.align),
+                    color: isSorted ? T.text : T.muted,
+                    fontWeight: 600,
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    cursor: "pointer",
+                    userSelect: "none",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {col.label}{" "}
+                  <span style={{ opacity: isSorted ? 1 : 0.25, fontSize: 10 }}>
+                    {isSorted ? (sortDir === "desc" ? "↓" : "↑") : "↕"}
+                  </span>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => (
+          {sorted.map((row, i) => (
             <tr key={i} style={{ backgroundColor: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)" }}>
               {columns.map((col) => {
                 const val = row[col.key];
-                const display = col.format ? col.format(val) : String(val ?? "—");
+                const display = col.format ? col.format(val) : String(val ?? "–");
                 const clr = col.colorFn ? col.colorFn(val) : undefined;
                 return (
                   <td key={col.key} style={{ ...cellStyle(col.align), color: clr || T.text }}>
@@ -308,12 +345,14 @@ function OverviewTab({ d }: { d: DashboardData }) {
   );
 }
 
-function SalesTab({ d }: { d: DashboardData }) {
+function SalesTab({ d }: { d: ApiData }) {
   const s = d.sales;
+  const callsPaid = d.callsPaid ?? 0;
+  const callsOrganic = d.callsOrganic ?? 0;
   return (
     <>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 12, marginBottom: 20 }}>
-        <MetricCard label="Total Calls" value={fmt.num(s.totalCalls)} />
+        <MetricCard label="Total Calls" value={fmt.num(s.totalCalls)} sub={(callsPaid || callsOrganic) ? `${fmt.num(callsPaid)} paid · ${fmt.num(callsOrganic)} organic` : undefined} />
         <MetricCard label="Sets Booked" value={fmt.num(s.setsBooked)} />
         <MetricCard label="Show Rate" value={fmt.pct(s.showRate)} color={s.showRate >= 0.7 ? T.green : T.amber} />
         <MetricCard label="Closed Deals" value={fmt.num(s.closedDeals)} />
@@ -332,6 +371,7 @@ function SalesTab({ d }: { d: DashboardData }) {
 
       <SectionCard title="Closer Performance">
         <DataTable
+          defaultSort="closes"
           columns={[
             { key: "name", label: "Name" },
             { key: "calls", label: "Calls", align: "right", format: (v: number) => fmt.num(v) },
@@ -503,7 +543,7 @@ function ARTab({ d }: { d: DashboardData }) {
 // ─── Main Dashboard Component ───────────────────────────────────────────────
 
 export default function Dashboard() {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [data, setData] = useState<ApiData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDemoMode, setIsDemoMode] = useState(false);
@@ -529,7 +569,7 @@ export default function Dashboard() {
 
         if (!res.ok) throw new Error(`API returned ${res.status}`);
 
-        const json: DashboardData = await res.json();
+        const json: ApiData = await res.json();
         setData(json);
         setIsDemoMode(false);
         setAuthed(true);
