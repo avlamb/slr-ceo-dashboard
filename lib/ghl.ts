@@ -74,7 +74,7 @@ export async function getWonOpportunitiesCurrentMonth(startDate: string): Promis
 
     for (const opp of opps) {
       // dateUpdated reflects when the status last changed (e.g. marked won)
-      const ts = opp.dateUpdated || opp.lastStatusChangeDate || opp.dateAdded || "";
+      const ts = opp.updatedAt || opp.lastStatusChangeAt || opp.createdAt || "";
       const ms = ts ? new Date(ts).getTime() : 0;
       if (ms >= startMs) allWon.push(opp);
     }
@@ -82,7 +82,7 @@ export async function getWonOpportunitiesCurrentMonth(startDate: string): Promis
     // Early exit: with updated_desc sort, once the oldest opp in this page
     // pre-dates startDate, all subsequent pages are also pre-startDate.
     const oldest = opps[opps.length - 1];
-    const oldestTs = oldest?.dateUpdated || oldest?.lastStatusChangeDate || oldest?.dateAdded || "";
+    const oldestTs = oldest?.updatedAt || oldest?.lastStatusChangeAt || oldest?.createdAt || "";
     const oldestMs = oldestTs ? new Date(oldestTs).getTime() : 0;
     if (oldestMs > 0 && oldestMs < startMs) break;
 
