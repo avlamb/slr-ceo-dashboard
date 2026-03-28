@@ -103,7 +103,8 @@ function transformSheetData(
   projection: Awaited<ReturnType<typeof fetchAllSheetData>>["projection"],
   errors: DataSourceError[],
   ghlCalendarTotal?: number,
-  ghlPerCalendar?: CalendarEntry[]
+  ghlPerCalendar?: CalendarEntry[],
+  ghlPerUser?: CalendarEntry[]
 ): DashboardData {
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -161,7 +162,8 @@ function transformSheetData(
   }
 
   // ── Override per-closer call counts with GHL calendar data (real-time) ──
-  const cals = ghlPerCalendar ?? [];
+  // Prefer perUser (assignedUserId-based, true per-rep counts) over perCalendar
+  const cals = (ghlPerUser && ghlPerUser.length > 0) ? ghlPerUser : (ghlPerCalendar ?? []);
   if (cals.length > 0) {
     // Override existing sheet-sourced call counts
     closerCallMap.forEach((_v, name) => {
