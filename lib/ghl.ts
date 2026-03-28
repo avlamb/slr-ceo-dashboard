@@ -1,4 +1,3 @@
-import { getCached, setCache, CACHE_TTL } from "./cache";
 
 const GHL_BASE = "https://services.leadconnectorhq.com";
 
@@ -112,7 +111,7 @@ export async function getGHLDashboardData() {
   const endOfMonth = now.toISOString();
 
   const errors: string[] = [];
-  const [opportunities, payments, pipelines] = await Promise.allSettled([
+  const [opportunities, pipelines] = await Promise.allSettled([
     getOpportunities(),
     getPipelines(),
   ]);
