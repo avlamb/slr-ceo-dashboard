@@ -25,8 +25,9 @@ export function setCache<T>(key: string, data: T, ttlMs: number): void {
 
 // TTLs by source
 export const CACHE_TTL = {
-  GHL: 5 * 60 * 1000,      // 5 minutes
-  HYROS: 15 * 60 * 1000,   // 15 minutes
-  META: 15 * 60 * 1000,    // 15 minutes
+  GHL: 5 * 60 * 1000,        // 5 minutes
+  HYROS: 15 * 60 * 1000,     // 15 minutes
+  META: 15 * 60 * 1000,      // 15 minutes
   AGGREGATED: 5 * 60 * 1000, // 5 minutes
+  SHEETS: 5 * 60 * 1000,     // 5 minutes — sheets updated multiple times daily
 };
