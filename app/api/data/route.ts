@@ -389,7 +389,6 @@ export async function GET() {
 
   // Cache check — stored with _ghlCalendars so both paths return it
   const cached = getCached<DashboardData & { _ghlCalendars: CalendarEntry[]; _ghlUsers: CalendarEntry[]; callsPaid: number; callsOrganic: number }>(
-      _ghlDebug: ghlCal._debug,
     "dashboard_sheets"
   );
   if (cached) return NextResponse.json(cached);
@@ -440,7 +439,7 @@ export async function GET() {
   );
 
   // Store with _ghlCalendars so cached responses also include it
-  const fullResponse = { ...dashboard, _ghlCalendars: ghlPerCalendar, _ghlUsers: ghlPerUser, callsPaid, callsOrganic };
+  const fullResponse = { ...dashboard, _ghlCalendars: ghlPerCalendar, _ghlUsers: ghlPerUser, _ghlDebug: calendarResult.status === "fulfilled" ? calendarResult.value?._debug : undefined, callsPaid, callsOrganic };
   setCache("dashboard_sheets", fullResponse, CACHE_TTL.SHEETS);
 
   return NextResponse.json(fullResponse);
