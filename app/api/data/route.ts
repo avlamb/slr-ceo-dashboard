@@ -1,273 +1,350 @@
+/**
+ * app/api/data/route.ts
+ * Primary data endpoint — reads from Google Sheets, returns DashboardData
+ *
+ * Cache: 5-minute in-memory TTL (server-side)
+ * Auth:  GOOGLE_SERVICE_ACCOUNT_KEY env var required
+ *
+ * Sources:
+ *   - SLR 2026 Closer Tracker Sheet     → sales KPIs, monthly history
+ *   - SLR 2026 Setter Tracker           → setter KPIs
+ *   - SLR Deals Master List             → per-rep breakdown, AR
+ *   - SLR Projection Dashboard 2026     → cash vs projection vs pace
+ *   - GoHighLevel Calendar API          → real appointment counts (totalCalls override)
+ */
+
 import { NextResponse } from "next/server";
-import { getGHLDashboardData } from "@/lib/ghl";
-import { getHyrosDashboardData } from "@/lib/hyros";
+import {
+  fetchAllSheetData,
+  money,
+  pct,
+  num,
+  MONTH_NAMES_SHORT,
+} from "@/lib/sheets";
+import { getCalendarAppointmentsCurrentMonth } from "@/lib/ghl";
 import { getCached, setCache, CACHE_TTL } from "@/lib/cache";
-import type { DashboardData, DataSourceError } from "@/lib/types";
+import type {
+  DashboardData,
+  CloserMetrics,
+  SetterMetrics,
+  DataSourceError,
+} from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-// âââ Transform raw API data into dashboard format ââââââââââââââââââââââ
-
-function transformData(
-  ghl: any,
-  hyros: any,
-  errors: DataSourceError[]
+// ─── Transform sheets data → DashboardData ─────────────────────────────────────
+function transformSheetData(
+  closer: Awaited<ReturnType<typeof fetchAllSheetData>>["closer"],
+  setter: Awaited<ReturnType<typeof fetchAllSheetData>>["setter"],
+  deals: Awaited<ReturnType<typeof fetchAllSheetData>>["deals"],
+  projection: Awaited<ReturnType<typeof fetchAllSheetData>>["projection"],
+  errors: DataSourceError[],
+  ghlCalendarTotal?: number
 ): DashboardData {
   const now = new Date();
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const period = `${MONTH_NAMES_SHORT[currentMonth]} ${currentYear}`;
 
-  // ââ Parse GHL opportunities into sales metrics ââ
-  const opps = ghl?.opportunities?.opportunities || [];
-  const payments = ghl?.payments?.data || [];
+  // ── Per-rep metrics from Deals Master List (current month only) ──
+  const closerDealsMap = new Map<string, { closes: number; revenue: number }>();
+  const setterDealsMap = new Map<string, { closes: number; revenue: number }>();
 
-  // wonOpportunities: paginated all won deals for current month
-  const wonOpps: any[] = (ghl?.wonOpportunities as any[]) || [];
-  const allWonOpps = wonOpps.length > 0 ? wonOpps : opps.filter((o: any) => o.status === "won");
+  if (deals?.deals) {
+    deals.deals
+      .filter((d) => {
+        if (!d.dateWon) return false;
+        return (
+          d.dateWon.getFullYear() === currentYear &&
+          d.dateWon.getMonth() === currentMonth
+        );
+      })
+      .forEach((d) => {
+        if (d.closer) {
+          const c = closerDealsMap.get(d.closer) || { closes: 0, revenue: 0 };
+          c.closes++;
+          c.revenue += d.dealValue;
+          closerDealsMap.set(d.closer, c);
+        }
+        if (d.setter) {
+          const s = setterDealsMap.get(d.setter) || { closes: 0, revenue: 0 };
+          s.closes++;
+          s.revenue += d.dealValue;
+          setterDealsMap.set(d.setter, s);
+        }
+      });
+  }
 
-  // Filter to deals in a "Closed" stage — closers sometimes mark won without moving stage
-  // (e.g. deals left in Hotlist, Booked, etc. should not count toward cash collected)
-  const closedStageIds = new Set<string>(
-    (ghl?.pipelines?.pipelines || []).flatMap((p: any) =>
-      (p.stages || [])
-        .filter((s: any) => {
-          const n = (s.name || "").toLowerCase();
-          return n === "closed" || n === "closed - won";
-        })
-        .map((s: any) => s.id as string)
-    )
-  );
-  const closedOpps = closedStageIds.size > 0
-    ? allWonOpps.filter((o: any) => closedStageIds.has(o.pipelineStageId))
-    : allWonOpps;
-  const totalOpps = opps.length;
-  // "Cash Collected" is stored in the single numeric custom field on each opportunity.
-  // monetaryValue = full program price (contract value); fieldValueNumber = actual cash received.
-  const cashCollected = closedOpps.reduce((sum: number, o: any) => {
-    const cashField = (o.customFields || []).find((f: any) => f.type === "number");
-    return sum + (cashField?.fieldValueNumber ?? o.monetaryValue ?? 0);
-  }, 0);
-
-  // Group by assignedTo for closer metrics
-  const closerMap = new Map<string, { calls: number; closes: number; revenue: number }>();
-  opps.forEach((o: any) => {
-    const assigned = o.assignedTo || "Unassigned";
-    const existing = closerMap.get(assigned) || { calls: 0, closes: 0, revenue: 0 };
-    existing.calls++;
-    if (o.status === "won") {
-      existing.closes++;
-      existing.revenue += o.monetaryValue || 0;
+  // ── Supplement closer call counts from Leaderboard tab ──
+  // Leaderboard: row 0 = headers, rows 1+ = reps
+  // Find "Name" and call/schedule column by header text
+  const closerCallMap = new Map<string, number>();
+  if (closer?.leaderboard && closer.leaderboard.length > 1) {
+    const headers = (closer.leaderboard[0] || []).map((h) =>
+      (h || "").toLowerCase()
+    );
+    const nameCol = headers.findIndex(
+      (h) => h.includes("name") || h.includes("rep") || h.includes("closer")
+    );
+    const callCol = headers.findIndex(
+      (h) => h.includes("sched") || h.includes("live") || h.includes("call")
+    );
+    if (nameCol >= 0 && callCol >= 0) {
+      closer.leaderboard.slice(1).forEach((row) => {
+        const name = row[nameCol];
+        const calls = num(row[callCol]);
+        if (name && calls > 0) closerCallMap.set(name, calls);
+      });
     }
-    closerMap.set(assigned, existing);
-  });
+  }
 
-  const closers = Array.from(closerMap.entries()).map(([name, data]) => ({
-    name,
-    calls: data.calls,
-    closes: data.closes,
-    revenue: data.revenue,
-    rate: data.calls > 0 ? data.closes / data.calls : 0,
+  // ── Build closers array ──
+  const closers: CloserMetrics[] = Array.from(
+    new Set([...closerDealsMap.keys(), ...closerCallMap.keys()])
+  )
+    .map((name) => {
+      const d = closerDealsMap.get(name) || { closes: 0, revenue: 0 };
+      const calls = closerCallMap.get(name) || 0;
+      return {
+        name,
+        calls,
+        closes: d.closes,
+        revenue: d.revenue,
+        rate: calls > 0 ? d.closes / calls : 0,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue);
+
+  // ── Build setters array from Setter Leaderboard tab ──
+  const setters: SetterMetrics[] = [];
+  if (setter?.leaderboard && setter.leaderboard.length > 1) {
+    const headers = (setter.leaderboard[0] || []).map((h) =>
+      (h || "").toLowerCase()
+    );
+    const nameCol = headers.findIndex(
+      (h) => h.includes("name") || h.includes("rep") || h.includes("setter")
+    );
+    const setsCol = headers.findIndex(
+      (h) => h.includes("set") && !h.includes("close") && !h.includes("off")
+    );
+    const showedCol = headers.findIndex(
+      (h) => h.includes("live") || h.includes("show")
+    );
+    const convCol = headers.findIndex(
+      (h) => h.includes("conv") || (h.includes("rate") && !h.includes("show"))
+    );
+
+    if (nameCol >= 0) {
+      setter.leaderboard.slice(1).forEach((row) => {
+        const name = row[nameCol];
+        if (!name) return;
+        setters.push({
+          name,
+          setsBooked: setsCol >= 0 ? num(row[setsCol]) : 0,
+          showed: showedCol >= 0 ? num(row[showedCol]) : 0,
+          convRate: convCol >= 0 ? pct(row[convCol]) : 0,
+        });
+      });
+    }
+  }
+
+  // ── Monthly revenue chart from closer history ──
+  const monthlyRevenue = (closer?.history || []).map((h) => ({
+    month: h.month,
+    revenue: h.cashCollected,
   }));
 
-  // ââ Parse Hyros data for marketing metrics ââ
-  const hyrosLeads = hyros?.leads?.data || [];
-  const hyrosSales = hyros?.sales?.data || [];
-  const hyrosSources = hyros?.sources?.data || [];
-  const hyrosAttribution = hyros?.attribution?.data || [];
+  // Use monthly history as period trend (labeled by month abbreviation)
+  const weeklyTrend = (closer?.history || []).map((h) => ({
+    week: h.month,
+    revenue: h.cashCollected,
+    deals: h.closes,
+  }));
 
-  const adLeads = hyrosLeads.filter((l: any) =>
-    (l.sources || []).some((s: string) =>
-      s.toLowerCase().includes("facebook") ||
-      s.toLowerCase().includes("meta") ||
-      s.toLowerCase().includes("google") ||
-      s.toLowerCase().includes("youtube")
-    )
-  ).length;
-  const organicLeads = hyrosLeads.length - adLeads;
+  // ── AR: deals with payment plans in current month ──
+  let arOutstanding = 0;
+  let paymentPlansActive = 0;
+  let paymentPlanValue = 0;
 
-  // ââ Ad spend: Meta campaigns as primary source, Hyros attribution as fallback ââ
-  const hyrosAdSpend = hyrosAttribution.reduce(
-    (sum: number, attr: any) => sum + (attr.cost || 0),
-    0
-  );
-  const totalAdSpend = hyrosAdSpend;
+  if (deals?.deals) {
+    deals.deals
+      .filter((d) => {
+        if (!d.dateWon) return false;
+        if (
+          d.dateWon.getFullYear() !== currentYear ||
+          d.dateWon.getMonth() !== currentMonth
+        )
+          return false;
+        const plan = (d.paymentPlan || "").toLowerCase();
+        return plan && plan !== "paid in full" && plan !== "pif";
+      })
+      .forEach((d) => {
+        paymentPlansActive++;
+        paymentPlanValue += d.dealValue;
+        // Extract deposit amount from payment plan string, subtract from outstanding
+        const depositMatch = d.paymentPlan.match(/\$?([\d,]+)\s*(down|deposit)/i);
+        const deposit = depositMatch ? money(depositMatch[1]) : 0;
+        arOutstanding += Math.max(d.dealValue - deposit, 0);
+      });
+  }
 
-  // Build channel breakdown from Hyros attribution
-  const channelMap = new Map<string, { leads: number; spend: number; booked: number; closed: number }>();
+  // ── MRR growth: compare current month vs previous month ──
+  const hist = closer?.history || [];
+  let mrrGrowth = 0;
+  if (hist.length >= 2) {
+    const prev = hist[hist.length - 2].cashCollected;
+    const curr = hist[hist.length - 1].cashCollected;
+    mrrGrowth = prev > 0 ? (curr - prev) / prev : 0;
+  }
 
-  hyrosAttribution.forEach((attr: any) => {
-    const source = attr.source || attr.campaign_name || "Unknown";
-    const existing = channelMap.get(source) || { leads: 0, spend: 0, booked: 0, closed: 0 };
-    existing.leads += attr.leads || 0;
-    existing.spend += attr.cost || 0;
-    existing.closed += attr.sales || 0;
-    channelMap.set(source, existing);
-  });
+  // ── Core values ──
+  const cashCollected =
+    projection?.cashActual || closer?.current?.cashCollected || 0;
+  const closes = closer?.current?.closes || 0;
 
-  const channels = Array.from(channelMap.entries())
-    .map(([name, data]) => ({
-      name,
-      leads: data.leads,
-      spend: data.spend,
-      cpl: data.leads > 0 ? data.spend / data.leads : 0,
-      booked: data.booked,
-      closed: data.closed,
-    }))
-    .sort((a, b) => b.leads - a.leads)
-    .slice(0, 8);
-
-  // ââ Calculate financial metrics ââ
-  const totalRevenue = hyrosSales.reduce((sum: number, s: any) => sum + (s.amount || 0), 0) || cashCollected;
-  const refunds = payments.filter((p: any) => p.status === "refunded");
-  const refundAmount = refunds.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-
-  // ââ Build dashboard data ââ
-  const dashboard: DashboardData = {
+  return {
     lastUpdated: now.toISOString(),
-    period: `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
+    period,
 
     sales: {
-      totalCalls: totalOpps,
-      setsBooked: Math.round(totalOpps * 0.6), // Estimate if not trackable directly
-      showRate: 0.72, // Will be refined with GHL calendar data
-      closedDeals: closedOpps.length,
-      closeRate: totalOpps > 0 ? closedOpps.length / totalOpps : 0,
-      cashCollected: cashCollected || totalRevenue,
-      avgDealSize: closedOpps.length > 0 ? (cashCollected || totalRevenue) / closedOpps.length : 0,
-      pipelineValue: opps
-        .filter((o: any) => o.status === "open")
-        .reduce((sum: number, o: any) => sum + (o.monetaryValue || 0), 0),
-      setterToCloseConversion: 0, // Needs setter tracking
+      // Prefer GHL calendar appointments (real-time); fall back to sheet's scheduled calls
+      totalCalls: ghlCalendarTotal ?? closer?.current?.scheduledCalls ?? 0,
+      setsBooked:
+        setter?.current?.setsOnCalendar ?? setter?.current?.sets ?? 0,
+      showRate: closer?.current?.showRate ?? 0,
+      closedDeals: closes,
+      closeRate: closer?.current?.callCloseRate ?? 0,
+      cashCollected,
+      avgDealSize: closes > 0 ? cashCollected / closes : 0,
+      pipelineValue: 0,
+      setterToCloseConversion: setter?.current?.setToClose ?? 0,
       closers,
-      setters: [], // Needs GHL user mapping
-      weeklyTrend: [], // Needs weekly aggregation
+      setters,
+      weeklyTrend,
     },
 
     fulfillment: {
-      activeClients: 0, // Needs GHL contact tag filtering
-      newOnboardings: 0,
+      activeClients: 0,
+      newOnboardings: closes,
       avgOnboardingDays: 0,
       clientSatisfaction: 0,
       churnRate: 0,
       churnedThisMonth: 0,
       retentionRate: 0,
       csms: [
-        { name: "Philip Blake", activeClients: 0, onboarded: 0, avgDays: 0, satisfaction: 0 },
-        { name: "Juanyetta Beasley", activeClients: 0, onboarded: 0, avgDays: 0, satisfaction: 0 },
+        {
+          name: "Philip Blake",
+          activeClients: 0,
+          onboarded: 0,
+          avgDays: 0,
+          satisfaction: 0,
+        },
+        {
+          name: "Juanyetta Beasley",
+          activeClients: 0,
+          onboarded: 0,
+          avgDays: 0,
+          satisfaction: 0,
+        },
       ],
       monthlyChurn: [],
     },
 
     financial: {
-      mrr: totalRevenue,
-      mrrGrowth: 0,
-      totalRevenueMTD: totalRevenue,
-      projectedMonthly: totalRevenue * (30 / now.getDate()),
-      refunds: refundAmount,
-      refundRate: totalRevenue > 0 ? refundAmount / totalRevenue : 0,
-      ltv: 0, // Needs historical calculation
-      cac: closedOpps.length > 0 ? totalAdSpend / closedOpps.length : 0,
+      mrr: cashCollected,
+      mrrGrowth,
+      totalRevenueMTD: cashCollected,
+      projectedMonthly: projection?.cashProjection ?? 0,
+      refunds: 0,
+      refundRate: 0,
+      ltv: 0,
+      cac: 0,
       ltvCacRatio: 0,
-      monthlyRevenue: [],
+      monthlyRevenue,
     },
 
     ar: {
-      totalOutstanding: 0, // Needs payment status analysis
-      current: 0,
+      totalOutstanding: arOutstanding,
+      current: arOutstanding,
       days30: 0,
       days60: 0,
       days90plus: 0,
-      collectionRate: 0,
+      collectionRate: closer?.current?.collectionRate ?? 0,
       avgDaysToCollect: 0,
       failedPayments: 0,
       failedPaymentAmount: 0,
-      paymentPlanActive: 0,
-      paymentPlanValue: 0,
+      paymentPlanActive: paymentPlansActive,
+      paymentPlanValue,
     },
 
     marketing: {
-      totalLeads: hyrosLeads.length,
-      adLeads,
-      organicLeads,
-      adSpend: totalAdSpend,
-      costPerLead: adLeads > 0 ? totalAdSpend / adLeads : 0,
-      costPerAcquisition: closedOpps.length > 0 ? totalAdSpend / closedOpps.length : 0,
-      roas: totalAdSpend > 0 ? totalRevenue / totalAdSpend : 0,
+      totalLeads: setter?.current?.leadsAssigned ?? 0,
+      adLeads: 0,
+      organicLeads: 0,
+      adSpend: 0,
+      costPerLead: 0,
+      costPerAcquisition: 0,
+      roas: 0,
       adCallsBooked: 0,
       organicCallsBooked: 0,
       adShowRate: 0,
       organicShowRate: 0,
-      channels,
+      channels: [],
       weeklyAdPerformance: [],
     },
 
     errors,
   };
-
-  return dashboard;
 }
 
-// âââ API Route Handler âââââââââââââââââââââââââââââââââââââââââââââââââ
-
-export async function GET(request: Request) {
-  // Simple password auth via query param or header
-  const url = new URL(request.url);
-  const authHeader = request.headers.get("x-dashboard-auth");
-  const authParam = url.searchParams.get("auth");
-  const password = process.env.DASHBOARD_PASSWORD;
-
-  if (password && authHeader !== password && authParam !== password) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+// ─── Route Handler ─────────────────────────────────────────────────────────────
+export async function GET() {
+  // No service account key → clear error
+  if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
+    return NextResponse.json(
+      {
+        error: "GOOGLE_SERVICE_ACCOUNT_KEY not configured",
+        setup: "Add service account JSON to .env.local — see .env.local.example",
+      },
+      { status: 503 }
+    );
   }
 
-  // Check aggregated cache first
-  const cached = getCached<DashboardData>("dashboard_aggregated");
-  if (cached) {
-    return NextResponse.json(cached);
-  }
+  // Cache check
+  const cached = getCached<DashboardData>("dashboard_sheets");
+  if (cached) return NextResponse.json(cached);
 
-  const errors: DataSourceError[] = [];
+  // Fetch all 4 sheets + GHL calendar in parallel
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  // Fetch all three sources in parallel
-  const [ghlResult, hyrosResult] = await Promise.allSettled([
-    getGHLDashboardData(),
-    getHyrosDashboardData(),
+  const [sheetsResult, calendarResult] = await Promise.allSettled([
+    fetchAllSheetData(),
+    process.env.GHL_API_TOKEN && process.env.GHL_LOCATION_ID
+      ? getCalendarAppointmentsCurrentMonth(startOfMonth)
+      : Promise.resolve(null),
   ]);
 
-  const ghl = ghlResult.status === "fulfilled" ? ghlResult.value : null;
-  const hyros = hyrosResult.status === "fulfilled" ? hyrosResult.value : null;
+  const { closer, setter, deals, projection, errors } =
+    sheetsResult.status === "fulfilled"
+      ? sheetsResult.value
+      : { closer: null, setter: null, deals: null, projection: null, errors: [] };
 
-  if (ghlResult.status === "rejected") {
-    errors.push({
-      source: "ghl",
-      message: ghlResult.reason?.message || "GHL fetch failed",
-      timestamp: new Date().toISOString(),
-    });
-  } else if (ghl?.errors?.length) {
-    // Partial GHL errors (some endpoints failed)
-    for (const e of ghl.errors) {
-      errors.push({ source: "ghl", message: e, timestamp: new Date().toISOString() });
-    }
-  }
+  const ghlCalendarTotal =
+    calendarResult.status === "fulfilled" && calendarResult.value
+      ? calendarResult.value.total
+      : undefined;
 
-  if (hyrosResult.status === "rejected") {
-    errors.push({
-      source: "hyros",
-      message: hyrosResult.reason?.message || "Hyros fetch failed",
-      timestamp: new Date().toISOString(),
-    });
-  } else if (hyros?.errors?.length) {
-    // Partial Hyros errors (some endpoints failed)
-    for (const e of hyros.errors) {
-      errors.push({ source: "hyros", message: e, timestamp: new Date().toISOString() });
-    }
-  }
+  const dashboard = transformSheetData(
+    closer,
+    setter,
+    deals,
+    projection,
+    errors as DataSourceError[],
+    ghlCalendarTotal
+  );
 
-  const dashboard = transformData(ghl, hyros, errors);
-
-  // Only cache if no errors
-  if (errors.length === 0) {
-    setCache("dashboard_aggregated", dashboard, CACHE_TTL.AGGREGATED);
-  }
+  setCache("dashboard_sheets", dashboard, CACHE_TTL.SHEETS);
 
   return NextResponse.json(dashboard);
 }
