@@ -233,6 +233,16 @@ export async function getCalendarAppointmentsCurrentMonth(
     (cal: any) => cal.name.includes("*") || /^organic/i.test(cal.name.trim())
   );
 
+  // ── Primary: seed name map from GHL_USER_NAMES_JSON env var ──────────
+  // Set once in Vercel: {"uuid1":"Closer Name",...} — survives token permission limits
+  const userIdToName = new Map<string, string>();
+  try {
+    const manualMap = JSON.parse(process.env.GHL_USER_NAMES_JSON ?? "{}");
+    for (const [id, name] of Object.entries(manualMap)) {
+      if (typeof name === "string") userIdToName.set(id, name);
+    }
+  } catch (_) {}
+
   // Fetch event counts in batches — collect events to attribute per-closer call counts
   const BATCH_SIZE = 10;
   let firstEventSample: any = null;
@@ -267,7 +277,7 @@ export async function getCalendarAppointmentsCurrentMonth(
           evt.assignedUserId || evt.userId || evt.users?.[0]?.id;
         if (!userId) continue;
         uniqueUserIds.add(userId);
-        // Extract name from assignedResources if available (avoids needing Users API)
+        // Extract name from assignedResources if available
         const resource: any = evt.assignedResources?.[0];
         if (resource?.id) {
           const rName = resource.name || [resource.firstName, resource.lastName].filter(Boolean).join(" ").trim();
@@ -278,18 +288,31 @@ export async function getCalendarAppointmentsCurrentMonth(
     });
   }
 
-  // Resolve IDs to names — fetch each user individually (avoids bulk /users/ scope issues)
-  const userIdToName = new Map<string, string>();
-  await Promise.allSettled(
-    Array.from(uniqueUserIds).map(async (uid) => {
-      try {
-        const userData = await ghlFetch(`/users/${uid}`);
-        const u: any = userData?.user ?? userData;
-        const name = [u?.firstName, u?.lastName].filter(Boolean).join(" ").trim();
-        if (name) userIdToName.set(uid, name);
-      } catch (_) { /* skip unresolvable user */ }
-    })
-  );
+  // ── Fallback 1: /calendars/resources/users (lists calendar-assignable users) ─
+  if (userIdToName.size < uniqueUserIds.size) {
+    try {
+      const resourceUsers = await ghlFetch("/calendars/resources/users");
+      for (const u of resourceUsers?.users ?? resourceUsers?.data ?? []) {
+        const name = [u.firstName, u.lastName].filter(Boolean).join(" ").trim() || u.name;
+        if (u.id && name) userIdToName.set(u.id, name);
+      }
+    } catch (_) {}
+  }
+
+  // ── Fallback 2: individual /users/{id} per unique ID ─────────────────
+  if (userIdToName.size < uniqueUserIds.size) {
+    await Promise.allSettled(
+      Array.from(uniqueUserIds).map(async (uid) => {
+        if (userIdToName.has(uid)) return;
+        try {
+          const userData = await ghlFetch(`/users/${uid}`);
+          const u: any = userData?.user ?? userData;
+          const name = [u?.firstName, u?.lastName].filter(Boolean).join(" ").trim();
+          if (name) userIdToName.set(uid, name);
+        } catch (_) { /* skip unresolvable user */ }
+      })
+    );
+  }
 
   const total = perCalendar.reduce((sum, c) => sum + c.count, 0);
   const perUser = Array.from(userIdCountMap.entries())
