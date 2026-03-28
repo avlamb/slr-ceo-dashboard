@@ -114,17 +114,14 @@ export async function getGHLDashboardData() {
   const errors: string[] = [];
   const [opportunities, payments, pipelines] = await Promise.allSettled([
     getOpportunities(),
-    getPayments(startOfMonth, endOfMonth),
     getPipelines(),
   ]);
 
   if (opportunities.status === "rejected") errors.push(`Opportunities: ${opportunities.reason?.message}`);
-  if (payments.status === "rejected") errors.push(`Payments: ${payments.reason?.message}`);
   if (pipelines.status === "rejected") errors.push(`Pipelines: ${pipelines.reason?.message}`);
 
   const result = {
     opportunities: opportunities.status === "fulfilled" ? opportunities.value : { opportunities: [] },
-    payments: payments.status === "fulfilled" ? payments.value : { data: [] },
     pipelines: pipelines.status === "fulfilled" ? pipelines.value : { pipelines: [] },
     errors,
     fetchedAt: new Date().toISOString(),
