@@ -74,7 +74,7 @@ export async function getWonOpportunitiesCurrentMonth(startDate: string): Promis
 
     for (const opp of opps) {
       // dateUpdated reflects when the status last changed (e.g. marked won)
-      const ts = opp.updatedAt || opp.lastStatusChangeAt || opp.createdAt || "";
+      const ts = opp.lastStatusChangeAt || opp.createdAt || ""; // Filter by status change date, not general updatedAt
       const ms = ts ? new Date(ts).getTime() : 0;
       if (ms >= startMs) allWon.push(opp);
     }
