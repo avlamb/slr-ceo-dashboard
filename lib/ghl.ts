@@ -209,7 +209,7 @@ export async function getCalendarAppointmentsCurrentMonth(
   total: number;
   perCalendar: Array<{ name: string; count: number }>;
   perUser: Array<{ name: string; count: number }>;
-  _debug?: { usersCount: number; mapSize: number; firstEvtKeys: string[]; usersDataKeys: string[] };
+  _debug?: { mapSize: number; uniqueUserIds: number; firstEvtKeys: string[] };
 }> {
   const cacheKey = `ghl_cal_appts_${startDate}`;
   const cached = getCached<any>(cacheKey);
@@ -233,20 +233,12 @@ export async function getCalendarAppointmentsCurrentMonth(
     (cal: any) => cal.name.includes("*") || /^organic/i.test(cal.name.trim())
   );
 
-  // Build userId -> name map for per-closer attribution
-  const usersData = await getUsers();
-  const userIdToName = new Map<string, string>();
-  for (const u of (usersData?.users ?? usersData?.data ?? usersData?.results ?? []) as any[]) {
-    const name = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
-    if (name) userIdToName.set(u.id, name);
-  }
-
-  // Fetch event counts in batches of 10 (parallel within each batch)
-  // Also collect events for per-user attribution
+  // Fetch event counts in batches — collect events to attribute per-closer call counts
   const BATCH_SIZE = 10;
   let firstEventSample: any = null;
   const perCalendar: Array<{ name: string; count: number }> = [];
-  const userCountMap = new Map<string, number>(); // userName -> count
+  const userIdCountMap = new Map<string, number>(); // userId -> raw count
+  const uniqueUserIds = new Set<string>();
 
   for (let i = 0; i < bookingCalendars.length; i += BATCH_SIZE) {
     const batch = bookingCalendars.slice(i, i + BATCH_SIZE);
@@ -270,26 +262,36 @@ export async function getCalendarAppointmentsCurrentMonth(
       const { name, count, events } = r.value;
       perCalendar.push({ name, count });
       if (!firstEventSample && events.length > 0) firstEventSample = events[0];
-      // Attribute each appointment to its assigned user
       for (const evt of events) {
         const userId: string | undefined =
           evt.assignedUserId || evt.userId || evt.users?.[0]?.id;
         if (!userId) continue;
-        const userName = userIdToName.get(userId);
-        if (!userName) continue;
-        // Skip CSMs
-        if (CSM_NAME_PATTERNS.some((p) => userName.toLowerCase().includes(p))) continue;
-        userCountMap.set(userName, (userCountMap.get(userName) || 0) + 1);
+        uniqueUserIds.add(userId);
+        userIdCountMap.set(userId, (userIdCountMap.get(userId) || 0) + 1);
       }
     });
   }
 
+  // Resolve IDs to names — fetch each user individually (avoids bulk /users/ scope issues)
+  const userIdToName = new Map<string, string>();
+  await Promise.allSettled(
+    Array.from(uniqueUserIds).map(async (uid) => {
+      try {
+        const userData = await ghlFetch(`/users/${uid}`);
+        const u: any = userData?.user ?? userData;
+        const name = [u?.firstName, u?.lastName].filter(Boolean).join(" ").trim();
+        if (name) userIdToName.set(uid, name);
+      } catch (_) { /* skip unresolvable user */ }
+    })
+  );
+
   const total = perCalendar.reduce((sum, c) => sum + c.count, 0);
-  const perUser = Array.from(userCountMap.entries())
-    .map(([name, count]) => ({ name, count }))
+  const perUser = Array.from(userIdCountMap.entries())
+    .map(([userId, count]) => ({ name: userIdToName.get(userId) ?? userId, count }))
+    .filter(({ name }) => !CSM_NAME_PATTERNS.some((p) => name.toLowerCase().includes(p)))
     .sort((a, b) => b.count - a.count);
 
-  const result = { total, perCalendar, perUser, _debug: { usersCount: usersData?.users?.length ?? 0, mapSize: userIdToName.size, firstEvtKeys: firstEventSample ? Object.keys(firstEventSample) : [], usersDataKeys: usersData ? Object.keys(usersData) : [] } };
+  const result = { total, perCalendar, perUser, _debug: { mapSize: userIdToName.size, uniqueUserIds: uniqueUserIds.size, firstEvtKeys: firstEventSample ? Object.keys(firstEventSample) : [] } };
   setCache(cacheKey, result, CACHE_TTL.GHL);
   return result;
 }
