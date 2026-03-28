@@ -1,11 +1,12 @@
 import { getCached, setCache, CACHE_TTL } from "./cache";
+
 const GHL_BASE = "https://services.leadconnectorhq.com";
 
 // GHL v2 API has strict schema validation per endpoint:
-// - /opportunities/search       → location_id (snake_case only)
-// - /opportunities/pipelines    → locationId  (camelCase only)
-// - /contacts/                  → locationId  (camelCase only)
-// - /payments/transactions      → no location param (inferred from token; needs Payments scope)
+// - /opportunities/search → location_id (snake_case only)
+// - /opportunities/pipelines → locationId (camelCase only)
+// - /contacts/ → locationId (camelCase only)
+// - /payments/transactions → no location param (inferred from token)
 // Passing both causes 422. Use locationParam to control which is appended.
 async function ghlFetch(endpoint: string, locationParam: "camel" | "snake" | "none" = "camel") {
   const token = process.env.GHL_API_TOKEN;
@@ -15,9 +16,11 @@ async function ghlFetch(endpoint: string, locationParam: "camel" | "snake" | "no
   const url = `${GHL_BASE}${endpoint}`;
   const sep = url.includes("?") ? "&" : "?";
   const locSuffix =
-    locationParam === "camel" ? `${sep}locationId=${locationId}` :
-    locationParam === "snake" ? `${sep}location_id=${locationId}` :
-    "";
+    locationParam === "camel"
+      ? `${sep}locationId=${locationId}`
+      : locationParam === "snake"
+      ? `${sep}location_id=${locationId}`
+      : "";
   const fullUrl = `${url}${locSuffix}`;
 
   const res = await fetch(fullUrl, {
@@ -30,12 +33,12 @@ async function ghlFetch(endpoint: string, locationParam: "camel" | "snake" | "no
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    throw new Error(`GHL API error: ${res.status} ${res.statusText} â ${body.slice(0, 200)}`);
+    throw new Error(`GHL API error: ${res.status} ${res.statusText} → ${body.slice(0, 200)}`);
   }
   return res.json();
 }
 
-// âââ Fetch opportunities (pipeline deals) ââââââââââââââââââââââââââââââ
+// ─── Fetch opportunities (first 100 snapshot for pipeline/totals) ──────────
 export async function getOpportunities(pipelineId?: string) {
   const cacheKey = `ghl_opportunities_${pipelineId || "all"}`;
   const cached = getCached<any>(cacheKey);
@@ -48,7 +51,50 @@ export async function getOpportunities(pipelineId?: string) {
   return data;
 }
 
-// âââ Fetch contacts with tags ââââââââââââââââââââââââââââââââââââââââââ
+// ─── Fetch ALL won opportunities for current month (cursor-paginated) ──────
+// Sorts by updated_desc so most-recently-won deals appear first.
+// Stops early once the oldest deal on a page pre-dates startDate.
+export async function getWonOpportunitiesCurrentMonth(startDate: string): Promise<any[]> {
+  const cacheKey = `ghl_won_opps_${startDate}`;
+  const cached = getCached<any[]>(cacheKey);
+  if (cached) return cached;
+
+  const startMs = new Date(startDate).getTime();
+  let allWon: any[] = [];
+  let startAfterId: string | null = null;
+  const MAX_PAGES = 30; // 30 × 100 = 3,000 max won deals
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    let endpoint = "/opportunities/search?status=won&order=updated_desc&limit=100";
+    if (startAfterId) endpoint += `&startAfterId=${encodeURIComponent(startAfterId)}`;
+
+    const data = await ghlFetch(endpoint, "snake");
+    const opps: any[] = data?.opportunities ?? [];
+    if (opps.length === 0) break;
+
+    for (const opp of opps) {
+      // dateUpdated reflects when the status last changed (e.g. marked won)
+      const ts = opp.dateUpdated || opp.lastStatusChangeDate || opp.dateAdded || "";
+      const ms = ts ? new Date(ts).getTime() : 0;
+      if (ms >= startMs) allWon.push(opp);
+    }
+
+    // Early exit: with updated_desc sort, once the oldest opp in this page
+    // pre-dates startDate, all subsequent pages are also pre-startDate.
+    const oldest = opps[opps.length - 1];
+    const oldestTs = oldest?.dateUpdated || oldest?.lastStatusChangeDate || oldest?.dateAdded || "";
+    const oldestMs = oldestTs ? new Date(oldestTs).getTime() : 0;
+    if (oldestMs > 0 && oldestMs < startMs) break;
+
+    startAfterId = data?.meta?.startAfterId ?? null;
+    if (!startAfterId) break;
+  }
+
+  setCache(cacheKey, allWon, CACHE_TTL.GHL);
+  return allWon;
+}
+
+// ─── Fetch contacts with tags ──────────────────────────────────────
 export async function getContacts(query?: string) {
   const cacheKey = `ghl_contacts_${query || "all"}`;
   const cached = getCached<any>(cacheKey);
@@ -60,10 +106,8 @@ export async function getContacts(query?: string) {
   return data;
 }
 
-// âââ Fetch payments/transactions âââââââââââââââââââââââââââââââââââââââ
-// NOTE: Requires the "Payments" scope on the GHL Private Integration Token.
-// If this returns 403, regenerate the PIT in GHL Settings > Private Integrations
-// and ensure "Payments" scope is checked.
+// ─── Fetch payments/transactions ─────────────────────────────────────
+// NOTE: Returns 403 if no payment processor (Stripe) connected to the GHL location.
 export async function getPayments(startDate?: string, endDate?: string) {
   const cacheKey = `ghl_payments_${startDate}_${endDate}`;
   const cached = getCached<any>(cacheKey);
@@ -73,13 +117,12 @@ export async function getPayments(startDate?: string, endDate?: string) {
   if (startDate && endDate) {
     params = `?startAt=${startDate}&endAt=${endDate}`;
   }
-  // /payments/transactions: location inferred from token. Needs "Payments" scope on PIT.
   const data = await ghlFetch(`/payments/transactions${params}`, "none");
   setCache(cacheKey, data, CACHE_TTL.GHL);
   return data;
 }
 
-// âââ Fetch pipelines ââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Fetch pipelines ────────────────────────────────────────────
 export async function getPipelines() {
   const cacheKey = "ghl_pipelines";
   const cached = getCached<any>(cacheKey);
@@ -91,13 +134,12 @@ export async function getPipelines() {
   return data;
 }
 
-// âââ Aggregate GHL data for dashboard ââââââââââââââââââââââââââââââââââ
+// ─── Aggregate GHL data for dashboard ──────────────────────────────
 export async function getGHLDashboardData() {
   const cacheKey = "ghl_dashboard";
   const cached = getCached<any>(cacheKey);
   if (cached) return cached;
 
-  // Fail fast if credentials are missing
   const token = process.env.GHL_API_TOKEN;
   const locationId = process.env.GHL_LOCATION_ID;
   if (!token || !locationId) {
@@ -108,25 +150,35 @@ export async function getGHLDashboardData() {
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-  const endOfMonth = now.toISOString();
 
   const errors: string[] = [];
-  const [opportunities, pipelines] = await Promise.allSettled([
+
+  const [opportunities, pipelines, wonOpportunities] = await Promise.allSettled([
     getOpportunities(),
     getPipelines(),
+    getWonOpportunitiesCurrentMonth(startOfMonth),
   ]);
 
-  if (opportunities.status === "rejected") errors.push(`Opportunities: ${opportunities.reason?.message}`);
-  if (pipelines.status === "rejected") errors.push(`Pipelines: ${pipelines.reason?.message}`);
+  if (opportunities.status === "rejected")
+    errors.push(`Opportunities: ${opportunities.reason?.message}`);
+  if (pipelines.status === "rejected")
+    errors.push(`Pipelines: ${pipelines.reason?.message}`);
+  if (wonOpportunities.status === "rejected")
+    errors.push(`WonOpportunities: ${wonOpportunities.reason?.message}`);
 
   const result = {
-    opportunities: opportunities.status === "fulfilled" ? opportunities.value : { opportunities: [] },
-    pipelines: pipelines.status === "fulfilled" ? pipelines.value : { pipelines: [] },
+    opportunities:
+      opportunities.status === "fulfilled"
+        ? opportunities.value
+        : { opportunities: [] },
+    pipelines:
+      pipelines.status === "fulfilled" ? pipelines.value : { pipelines: [] },
+    wonOpportunities:
+      wonOpportunities.status === "fulfilled" ? wonOpportunities.value : [],
     errors,
     fetchedAt: new Date().toISOString(),
   };
 
-  // Only cache if no errors
   if (errors.length === 0) {
     setCache(cacheKey, result, CACHE_TTL.GHL);
   }
