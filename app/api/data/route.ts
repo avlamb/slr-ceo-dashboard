@@ -20,7 +20,9 @@ function transformData(
   const opps = ghl?.opportunities?.opportunities || [];
   const payments = ghl?.payments?.data || [];
 
-  const closedOpps = opps.filter((o: any) => o.status === "won");
+  // wonOpportunities: paginated all won deals for current month
+  const wonOpps: any[] = (ghl?.wonOpportunities as any[]) || [];
+  const closedOpps = wonOpps.length > 0 ? wonOpps : opps.filter((o: any) => o.status === "won");
   const totalOpps = opps.length;
   const cashCollected = closedOpps.reduce((sum: number, o: any) => sum + (o.monetaryValue || 0), 0);
 
