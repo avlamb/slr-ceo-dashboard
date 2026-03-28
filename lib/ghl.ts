@@ -175,7 +175,7 @@ export async function getUsers() {
   if (cached) return cached;
 
   try {
-    const data = await ghlFetch("/users/");
+    const data = await ghlFetch(`/users/?locationId=${process.env.GHL_LOCATION_ID ?? ""}`);
     setCache(cacheKey, data, CACHE_TTL.GHL);
     return data;
   } catch (err) {
