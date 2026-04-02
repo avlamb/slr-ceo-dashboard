@@ -10,7 +10,7 @@
  *   - SLR 2026 Setter Tracker           → setter KPIs
  *   - SLR Deals Master List             → per-rep breakdown, AR
  *   - SLR Projection Dashboard 2026     → cash vs projection vs pace
- *   - GoHighLevel Calendar API          → real appointment counts (totalCalls + per-closer)
+ *   - GoHighLevel Calendar API          → real appointment counts (totalCalls override)
  */
 
 import { NextResponse } from "next/server";
@@ -22,6 +22,7 @@ import {
   MONTH_NAMES_SHORT,
 } from "@/lib/sheets";
 import { getCalendarAppointmentsCurrentMonth } from "@/lib/ghl";
+import { getAirtableSummary } from "@/lib/airtable";
 import { getCached, setCache, CACHE_TTL } from "@/lib/cache";
 import type {
   DashboardData,
@@ -32,69 +33,6 @@ import type {
 
 export const dynamic = "force-dynamic";
 
-type CalendarEntry = { name: string; count: number };
-
-// ─── Fuzzy-match a closer name to a GHL calendar entry ────────────────────────
-// Strategy: split closer name into tokens (≥3 chars), require ALL tokens to
-// appear in the calendar name. Falls back to any-single-token match if needed.
-const NICKNAMES: Record<string, string[]> = {
-  gabriel: ["gabe"],
-  gabe: ["gabriel"],
-  dan: ["daniel"],
-  daniel: ["dan"],
-  nate: ["nathan", "nathaniel"],
-  nathan: ["nate"],
-};
-
-function expandName(tokens: string[]): string[] {
-  const expanded = new Set(tokens);
-  for (const t of tokens) {
-    const alts = NICKNAMES[t];
-    if (alts) alts.forEach((a) => expanded.add(a));
-  }
-  return Array.from(expanded);
-}
-
-// ─── Fuzzy-match a closer name to a GHL calendar entry ────────────────────────
-// 3-tier: exact → all-token (nickname-expanded) → scored first-name fallback.
-function matchCalendar(
-  closerName: string,
-  calendars: CalendarEntry[]
-): number {
-  const lower = closerName.toLowerCase().trim();
-  const tokens = lower.split(/\s+/).filter((t) => t.length >= 3);
-  if (tokens.length === 0) return 0;
-  const expanded = expandName(tokens);
-
-  // 1. Exact substring match
-  for (const cal of calendars) {
-    if (cal.name.toLowerCase().includes(lower)) return cal.count;
-  }
-
-  // 2. All-token match (nickname-expanded)
-  if (expanded.length > 1) {
-    for (const cal of calendars) {
-      const cn = cal.name.toLowerCase();
-      if (expanded.every((t) => cn.includes(t))) return cal.count;
-    }
-  }
-
-  // 3. Scored first-name fallback — picks best match when multiple cals share first name
-  const firstAlts = expandName([tokens[0]]);
-  let best: { count: number; score: number } | null = null;
-  for (const cal of calendars) {
-    const cn = cal.name.toLowerCase();
-    if (!firstAlts.some((fn) => cn.includes(fn))) continue;
-    let score = 1;
-    for (const t of tokens.slice(1)) {
-      if (cn.includes(t)) score += 2;
-      else if (new RegExp("[ -]" + t[0] + "(?:[ -]|$)").test(cn)) score += 1;
-    }
-    if (!best || score > best.score) best = { count: cal.count, score };
-  }
-  return best?.count ?? 0;
-}
-
 // ─── Transform sheets data → DashboardData ─────────────────────────────────────
 function transformSheetData(
   closer: Awaited<ReturnType<typeof fetchAllSheetData>>["closer"],
@@ -103,8 +41,7 @@ function transformSheetData(
   projection: Awaited<ReturnType<typeof fetchAllSheetData>>["projection"],
   errors: DataSourceError[],
   ghlCalendarTotal?: number,
-  ghlPerCalendar?: CalendarEntry[],
-  ghlPerUser?: CalendarEntry[]
+  airtable?: Awaited<ReturnType<typeof getAirtableSummary>>
 ): DashboardData {
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -141,6 +78,8 @@ function transformSheetData(
   }
 
   // ── Supplement closer call counts from Leaderboard tab ──
+  // Leaderboard: row 0 = headers, rows 1+ = reps
+  // Find "Name" and call/schedule column by header text
   const closerCallMap = new Map<string, number>();
   if (closer?.leaderboard && closer.leaderboard.length > 1) {
     const headers = (closer.leaderboard[0] || []).map((h) =>
@@ -161,28 +100,9 @@ function transformSheetData(
     }
   }
 
-  // ── Override per-closer call counts with GHL calendar data (real-time) ──
-  // Prefer perUser (assignedUserId-based, true per-rep counts) over perCalendar
-  const cals = (ghlPerUser && ghlPerUser.length > 0) ? ghlPerUser : (ghlPerCalendar ?? []);
-  if (cals.length > 0) {
-    // Override existing sheet-sourced call counts
-    closerCallMap.forEach((_v, name) => {
-      const ghlCount = matchCalendar(name, cals);
-      if (ghlCount > 0) closerCallMap.set(name, ghlCount);
-    });
-    // Add closers from Deals that have no leaderboard entry
-    closerDealsMap.forEach((_v, name) => {
-      if (!closerCallMap.has(name)) {
-        const ghlCount = matchCalendar(name, cals);
-        if (ghlCount > 0) closerCallMap.set(name, ghlCount);
-      }
-    });
-
-  }
-
   // ── Build closers array ──
   const closers: CloserMetrics[] = Array.from(
-    new Set([...Array.from(closerDealsMap.keys()), ...Array.from(closerCallMap.keys())])
+    new Set([...closerDealsMap.keys(), ...closerCallMap.keys()])
   )
     .map((name) => {
       const d = closerDealsMap.get(name) || { closes: 0, revenue: 0 };
@@ -236,6 +156,7 @@ function transformSheetData(
     revenue: h.cashCollected,
   }));
 
+  // Use monthly history as period trend (labeled by month abbreviation)
   const weeklyTrend = (closer?.history || []).map((h) => ({
     week: h.month,
     revenue: h.cashCollected,
@@ -262,13 +183,14 @@ function transformSheetData(
       .forEach((d) => {
         paymentPlansActive++;
         paymentPlanValue += d.dealValue;
+        // Extract deposit amount from payment plan string, subtract from outstanding
         const depositMatch = d.paymentPlan.match(/\$?([\d,]+)\s*(down|deposit)/i);
         const deposit = depositMatch ? money(depositMatch[1]) : 0;
         arOutstanding += Math.max(d.dealValue - deposit, 0);
       });
   }
 
-  // ── MRR growth ──
+  // ── MRR growth: compare current month vs previous month ──
   const hist = closer?.history || [];
   let mrrGrowth = 0;
   if (hist.length >= 2) {
@@ -277,15 +199,21 @@ function transformSheetData(
     mrrGrowth = prev > 0 ? (curr - prev) / prev : 0;
   }
 
+  // ── Core values ──
   const cashCollected =
     projection?.cashActual || closer?.current?.cashCollected || 0;
-  const closes = closer?.current?.closes || 0;
+  // Prefer projection sheet's totalUnitsActual (reconciled) over closer tracker raw closes
+  const closes =
+    (projection?.totalUnitsActual ?? 0) > 0
+      ? projection!.totalUnitsActual
+      : closer?.current?.closes ?? 0;
 
   return {
     lastUpdated: now.toISOString(),
     period,
 
     sales: {
+      // Prefer GHL calendar appointments (real-time); fall back to sheet's scheduled calls
       totalCalls: ghlCalendarTotal ?? closer?.current?.scheduledCalls ?? 0,
       setsBooked:
         setter?.current?.setsOnCalendar ?? setter?.current?.sets ?? 0,
@@ -302,7 +230,8 @@ function transformSheetData(
     },
 
     fulfillment: {
-      activeClients: 0,
+      // Prefer Airtable active client count when available
+      activeClients: airtable?.activeClients || 0,
       newOnboardings: closes,
       avgOnboardingDays: 0,
       clientSatisfaction: 0,
@@ -312,20 +241,44 @@ function transformSheetData(
       csms: [
         {
           name: "Philip Blake",
-          activeClients: 0,
+          activeClients: airtable?.clientsByCSM?.["Philip Blake"] || airtable?.clientsByCSM?.["Philip"] || 0,
           onboarded: 0,
           avgDays: 0,
           satisfaction: 0,
         },
         {
           name: "Juanyetta Beasley",
-          activeClients: 0,
+          activeClients: airtable?.clientsByCSM?.["Juanyetta Beasley"] || airtable?.clientsByCSM?.["Juanyetta"] || 0,
           onboarded: 0,
           avgDays: 0,
           satisfaction: 0,
         },
       ],
       monthlyChurn: [],
+      // Airtable CRM data
+      airtableClients: (airtable?.recentClients || []).map((c) => ({
+        id: c.id,
+        name: c.name,
+        status: c.status,
+        csm: c.csm,
+        startDate: c.startDate,
+        program: c.program,
+        paymentStatus: c.paymentStatus,
+        balance: c.balance,
+      })),
+      airtableCSMWeekly: (airtable?.latestCSMWeekly || []).map((w) => ({
+        csm: w.csm,
+        weekEnding: w.weekEnding,
+        checkIns: w.checkIns,
+        goalsSet: w.goalsSet,
+        goalsHit: w.goalsHit,
+        clients: w.clients,
+      })),
+      airtableSource: !process.env.AIRTABLE_PAT
+        ? "unconfigured"
+        : airtable?.source === "live"
+        ? "live"
+        : "error",
     },
 
     financial: {
@@ -377,6 +330,7 @@ function transformSheetData(
 
 // ─── Route Handler ─────────────────────────────────────────────────────────────
 export async function GET() {
+  // No service account key → clear error
   if (!process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
     return NextResponse.json(
       {
@@ -387,19 +341,21 @@ export async function GET() {
     );
   }
 
-  // Cache check — stored with _ghlCalendars so both paths return it
-  const cached = getCached<DashboardData & { _ghlCalendars: CalendarEntry[]; _ghlUsers: CalendarEntry[]; callsPaid: number; callsOrganic: number }>(
-    "dashboard_sheets"
-  );
+  // Cache check
+  const cached = getCached<DashboardData>("dashboard_sheets");
   if (cached) return NextResponse.json(cached);
 
+  // Fetch all 4 sheets + GHL calendar + Airtable in parallel
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  const [sheetsResult, calendarResult] = await Promise.allSettled([
+  const [sheetsResult, calendarResult, airtableResult] = await Promise.allSettled([
     fetchAllSheetData(),
     process.env.GHL_API_TOKEN && process.env.GHL_LOCATION_ID
       ? getCalendarAppointmentsCurrentMonth(startOfMonth)
+      : Promise.resolve(null),
+    process.env.AIRTABLE_PAT
+      ? getAirtableSummary()
       : Promise.resolve(null),
   ]);
 
@@ -408,24 +364,15 @@ export async function GET() {
       ? sheetsResult.value
       : { closer: null, setter: null, deals: null, projection: null, errors: [] };
 
-  const ghlPerCalendar: CalendarEntry[] =
-    calendarResult.status === "fulfilled" && calendarResult.value
-      ? calendarResult.value.perCalendar
-      : [];
-
-  // Identify paid (self-book, has *) and organic calendars for separate tracking
-  const paidCal = ghlPerCalendar.find((c) => c.name.includes("*"));
-  const organicCal = ghlPerCalendar.find((c) => /^organic/i.test(c.name.trim()));
-  const callsPaid = paidCal?.count ?? 0;
-  const callsOrganic = organicCal?.count ?? 0;
-  // totalCalls = paid + organic (avoids double-counting setter/aggregate calendars)
   const ghlCalendarTotal =
-    callsPaid + callsOrganic > 0 ? callsPaid + callsOrganic : undefined;
-
-  const ghlPerUser: CalendarEntry[] =
     calendarResult.status === "fulfilled" && calendarResult.value
-      ? (calendarResult.value.perUser ?? [])
-      : [];
+      ? calendarResult.value.total
+      : undefined;
+
+  const airtable =
+    airtableResult.status === "fulfilled" && airtableResult.value
+      ? airtableResult.value
+      : undefined;
 
   const dashboard = transformSheetData(
     closer,
@@ -434,13 +381,10 @@ export async function GET() {
     projection,
     errors as DataSourceError[],
     ghlCalendarTotal,
-    ghlPerCalendar,
-    ghlPerUser
+    airtable
   );
 
-  // Store with _ghlCalendars so cached responses also include it
-  const fullResponse = { ...dashboard, _ghlCalendars: ghlPerCalendar, _ghlUsers: ghlPerUser, _ghlDebug: calendarResult.status === "fulfilled" ? calendarResult.value?._debug : undefined, callsPaid, callsOrganic };
-  setCache("dashboard_sheets", fullResponse, CACHE_TTL.SHEETS);
+  setCache("dashboard_sheets", dashboard, CACHE_TTL.SHEETS);
 
-  return NextResponse.json(fullResponse);
+  return NextResponse.json(dashboard);
 }
