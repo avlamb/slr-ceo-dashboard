@@ -1,4 +1,4 @@
-// âââ Dashboard Data Types ââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Dashboard Data Types ──────────────────────────────────────────────
 
 export interface DashboardData {
   lastUpdated: string;
@@ -17,7 +17,7 @@ export interface DataSourceError {
   timestamp: string;
 }
 
-// âââ Sales âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Sales ─────────────────────────────────────────────────────────────
 
 export interface SalesData {
   totalCalls: number;
@@ -55,7 +55,7 @@ export interface WeeklyRevenue {
   deals: number;
 }
 
-// âââ Fulfillment âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Fulfillment ───────────────────────────────────────────────────────
 
 export interface FulfillmentData {
   activeClients: number;
@@ -67,6 +67,10 @@ export interface FulfillmentData {
   retentionRate: number;
   csms: CSMMetrics[];
   monthlyChurn: MonthlyChurn[];
+  // Airtable CRM data (optional — populated when AIRTABLE_PAT is configured)
+  airtableClients?: AirtableClientSummary[];
+  airtableCSMWeekly?: AirtableCSMWeeklySummary[];
+  airtableSource?: "live" | "error" | "unconfigured";
 }
 
 export interface CSMMetrics {
@@ -82,7 +86,29 @@ export interface MonthlyChurn {
   rate: number;
 }
 
-// âââ Financial âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Airtable Client Summary ────────────────────────────────────────────
+
+export interface AirtableClientSummary {
+  id: string;
+  name: string;
+  status: string;
+  csm: string;
+  startDate: string;
+  program: string;
+  paymentStatus: string;
+  balance: number;
+}
+
+export interface AirtableCSMWeeklySummary {
+  csm: string;
+  weekEnding: string;
+  checkIns: number;
+  goalsSet: number;
+  goalsHit: number;
+  clients: number;
+}
+
+// ─── Financial ─────────────────────────────────────────────────────────
 
 export interface FinancialData {
   mrr: number;
@@ -102,7 +128,7 @@ export interface MonthlyRevenuePoint {
   revenue: number;
 }
 
-// âââ Accounts Receivable âââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Accounts Receivable ───────────────────────────────────────────────
 
 export interface ARData {
   totalOutstanding: number;
@@ -118,7 +144,7 @@ export interface ARData {
   paymentPlanValue: number;
 }
 
-// âââ Marketing âââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ─── Marketing ─────────────────────────────────────────────────────────
 
 export interface MarketingData {
   totalLeads: number;
@@ -152,7 +178,7 @@ export interface WeeklyAdPerformance {
   cpl: number;
 }
 
-// âââ GHL API Response Types ââââââââââââââââââââââââââââââââââââââââââââ
+// ─── GHL API Response Types ────────────────────────────────────────────
 
 export interface GHLContact {
   id: string;
@@ -188,7 +214,7 @@ export interface GHLPayment {
   createdAt: string;
 }
 
-// âââ Hyros API Response Types ââââââââââââââââââââââââââââââââââââââââââ
+// ─── Hyros API Response Types ──────────────────────────────────────────
 
 export interface HyrosLead {
   id: string;
@@ -223,7 +249,7 @@ export interface HyrosAdAttribution {
   roas: number;
 }
 
-// âââ Meta Ads API Response Types âââââââââââââââââââââââââââââââââââââââ
+// ─── Meta Ads API Response Types ───────────────────────────────────────
 
 export interface MetaCampaignInsight {
   campaign_id: string;
